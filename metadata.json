@@ -1,0 +1,8 @@
+
+{
+  "name": "Manutenção Pro - Gestão Industrial",
+  "description": "Uma plataforma completa para gestão de inventário de peças, alertas de estoque, requisições de compra e relatórios de manutenção industrial.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
