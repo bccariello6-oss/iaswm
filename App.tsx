@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
@@ -20,43 +20,43 @@ const App: React.FC = () => {
   const [view, setView] = useState<'login' | 'register'>('login');
 
   useEffect(() => {
-    // Initial check
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await fetchProfile(session.user.id, session.user.email);
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Initial session check failed:', err);
-        setLoading(false);
-      }
-    };
-
-    checkSession();
-
-    // Safety timeout to prevent infinite loading
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
+    let mounted = true;
 
     // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      clearTimeout(timer); // Clear if we get an event
-      if (event === 'SIGNED_IN' && session) {
-        await fetchProfile(session.user.id, session.user.email);
-      } else if (event === 'SIGNED_OUT') {
+      if (!mounted) return;
+
+      if (session) {
+        // Optimistic update: set user with email immediately to speed up UI transition
+        if (!currentUser || currentUser.id !== session.user.id) {
+          setCurrentUser({
+            id: session.user.id,
+            name: session.user.email?.split('@')[0] || 'Usuário',
+            email: session.user.email || '',
+            role: 'Técnico', // Default role until profile is loaded
+            status: 'Ativo',
+            lastAccess: 'Agora',
+            avatarUrl: ''
+          });
+
+          // Fetch full profile in background
+          fetchProfile(session.user.id, session.user.email);
+        }
+      } else {
         setCurrentUser(null);
         setLoading(false);
-      } else if (event === 'INITIAL_SESSION' && !session) {
+      }
+
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [currentUser]);
 
   const fetchProfile = async (userId: string, email?: string) => {
     try {
