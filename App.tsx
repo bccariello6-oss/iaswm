@@ -1,20 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Inventory from './pages/Inventory';
-import Alerts from './pages/Alerts';
-import PartDetails from './pages/PartDetails';
-import PurchaseRequest from './pages/PurchaseRequest';
-import ServiceRequest from './pages/ServiceRequest';
-import ServiceScope from './pages/ServiceScope';
-import Reports from './pages/Reports';
-import Users from './pages/Users';
-import Login from './pages/Login';
-import Register from './pages/Register';
 import { User } from './types';
 import { supabase } from './lib/supabase';
-import { MOCK_USERS } from './data';
+
+// Lazy load pages for better performance
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const PartDetails = lazy(() => import('./pages/PartDetails'));
+const PurchaseRequest = lazy(() => import('./pages/PurchaseRequest'));
+const ServiceRequest = lazy(() => import('./pages/ServiceRequest'));
+const ServiceScope = lazy(() => import('./pages/ServiceScope'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Users = lazy(() => import('./pages/Users'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+
+const PageLoading = () => (
+  <div className="flex items-center justify-center min-h-[400px]">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -148,18 +155,20 @@ const App: React.FC = () => {
     <Router>
       <ConnectionStatus />
       <Layout user={currentUser} onLogout={handleLogout}>
-        <Routes>
-          <Route path="/escopo" element={<ServiceScope user={currentUser} />} />
-          <Route path="/" element={<Dashboard user={currentUser} />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/part/:id" element={<PartDetails />} />
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/requests" element={<PurchaseRequest />} />
-          <Route path="/service-requests" element={<ServiceRequest />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<PageLoading />}>
+          <Routes>
+            <Route path="/escopo" element={<ServiceScope user={currentUser} />} />
+            <Route path="/" element={<Dashboard user={currentUser} />} />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/part/:id" element={<PartDetails />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/requests" element={<PurchaseRequest />} />
+            <Route path="/service-requests" element={<ServiceRequest />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/users" element={<Users />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </Layout>
     </Router>
   );

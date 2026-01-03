@@ -21,35 +21,54 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     try {
       const isAdmin = user.role === 'Administrador';
 
-      let partsQuery = supabase.from('parts').select('*');
-      let requestsQuery = supabase.from('purchase_requests').select('*');
+      // Select only needed columns for metrics and alerts
+      let partsQuery = supabase
+        .from('parts')
+        .select('id, name, quantity, min_quantity, cost');
+
+      // Efficiently fetch separately to ensure we get 5 of each without over-fetching
+      let materialQuery = supabase
+        .from('purchase_requests')
+        .select('id, created_at, status, priority, part_name, sku, request_category')
+        .eq('request_category', 'Material')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      let serviceQuery = supabase
+        .from('purchase_requests')
+        .select('id, created_at, status, priority, service_description, service_code, request_category')
+        .eq('request_category', 'Serviço')
+        .order('created_at', { ascending: false })
+        .limit(5);
 
       if (!isAdmin) {
-        // If not admin, only show items linked to their user_id
-        // Note: parts table might not have user_id if it's strictly global, 
-        // but purchase_requests definitely does. 
-        // If parts don't have user_id, we'll fetch all but metrics might vary if user wants private stock.
-        // For now, assuming standard multi-tenant or private view requests.
-        requestsQuery = requestsQuery.eq('user_id', user.id);
+        materialQuery = materialQuery.eq('user_id', user.id);
+        serviceQuery = serviceQuery.eq('user_id', user.id);
       }
 
-      const [{ data: partsData, error: partsError }, { data: requestsData, error: requestsError }] = await Promise.all([
+      const [
+        { data: partsData, error: partsError },
+        { data: matData, error: matError },
+        { data: servData, error: servError }
+      ] = await Promise.all([
         partsQuery,
-        requestsQuery.order('created_at', { ascending: false })
+        materialQuery,
+        serviceQuery
       ]);
 
       if (partsError) throw partsError;
-      if (requestsError) throw requestsError;
+      if (matError) throw matError;
+      if (servError) throw servError;
 
       setParts(partsData as any);
 
-      const allRequests = requestsData.map(req => ({
+      const formatRequest = (req: any) => ({
         ...req,
         date: new Date(req.created_at).toLocaleDateString('pt-BR')
-      })) as PurchaseRequest[];
+      });
 
-      setMaterialRequests(allRequests.filter(r => r.request_category === 'Material').slice(0, 5));
-      setServiceRequests(allRequests.filter(r => r.request_category === 'Serviço').slice(0, 5));
+      setMaterialRequests((matData || []).map(formatRequest) as any);
+      setServiceRequests((servData || []).map(formatRequest) as any);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

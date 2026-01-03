@@ -35,7 +35,7 @@ const Inventory: React.FC = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('parts')
-        .select('*')
+        .select('id, name, sku, category, quantity, unit, location, min_quantity, image_url, cost')
         .order('name', { ascending: true });
 
       if (error) throw error;
