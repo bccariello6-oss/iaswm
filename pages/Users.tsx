@@ -54,6 +54,20 @@ const Users: React.FC = () => {
     }
   };
 
+  const updateRole = async (id: string, newRole: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', id);
+
+      if (error) throw error;
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, role: newRole as any } : u));
+    } catch (err) {
+      console.error('Erro ao atualizar cargo:', err);
+    }
+  };
+
   const deleteUser = async (id: string, name: string) => {
     if (!window.confirm(`Tem certeza que deseja excluir o perfil de "${name}"? Esta ação não pode ser desfeita.`)) return;
 

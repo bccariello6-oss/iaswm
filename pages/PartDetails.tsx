@@ -116,15 +116,29 @@ const PartDetails: React.FC = () => {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setEditData(prev => ({ ...prev, image_url: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${id}-${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('part-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('part-images')
+        .getPublicUrl(filePath);
+
+      setEditData(prev => ({ ...prev, image_url: publicUrl }));
+    } catch (error: any) {
+      alert('Erro ao carregar imagem: ' + error.message);
+    }
   };
 
   if (loading) {

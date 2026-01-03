@@ -82,4 +82,6 @@ export interface PurchaseRequest {
   os_type?: 'Ordem Corretiva' | 'Preventiva' | 'Corretiva Não Planejada' | 'Melhoria' | 'Projeto';
   usage_area?: string;
   project_number?: string;
+  estimated_value?: number;
+  asset_number?: string;
 }

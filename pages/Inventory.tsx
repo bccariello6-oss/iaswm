@@ -10,6 +10,9 @@ const Inventory: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState('Todas');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -50,9 +53,30 @@ const Inventory: React.FC = () => {
   const handleAddPart = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      setUploading(true);
+      let image_url = '';
+
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('part-images')
+          .upload(filePath, selectedFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('part-images')
+          .getPublicUrl(filePath);
+
+        image_url = publicUrl;
+      }
+
       const { error } = await supabase
         .from('parts')
-        .insert([formData]);
+        .insert([{ ...formData, image_url }]);
 
       if (error) throw error;
 
@@ -71,9 +95,25 @@ const Inventory: React.FC = () => {
         model: '',
         supplier: ''
       });
+      setSelectedFile(null);
+      setImagePreview(null);
       fetchParts();
     } catch (error: any) {
       alert('Erro ao adicionar peça: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -300,6 +340,25 @@ const Inventory: React.FC = () => {
                     <option>MT</option>
                   </select>
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Foto da Peça</label>
+                  <div className="flex items-center gap-4">
+                    <div className="size-20 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 flex items-center justify-center overflow-hidden">
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="material-symbols-outlined text-slate-300">image</span>
+                      )}
+                    </div>
+                    <label className="flex-1">
+                      <div className="h-11 px-4 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors">
+                        <span className="material-symbols-outlined text-sm">upload</span>
+                        <span className="text-xs font-bold uppercase">Selecionar Foto</span>
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
@@ -312,9 +371,11 @@ const Inventory: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-10 py-2.5 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+                  disabled={uploading}
+                  className="px-10 py-2.5 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50"
                 >
-                  Salvar Peça
+                  {uploading ? <span className="material-symbols-outlined animate-spin text-[18px]">sync</span> : null}
+                  {uploading ? 'Salvando...' : 'Salvar Peça'}
                 </button>
               </div>
             </form>

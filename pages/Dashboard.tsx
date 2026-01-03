@@ -230,7 +230,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900 dark:text-white">{part.name}</p>
-                    <p className="text-xs text-slate-500">Qtd: {part.quantity} / Mín: {part.minQuantity}</p>
+                    <p className="text-xs text-slate-500">Qtd: {part.quantity} / Mín: {part.min_quantity}</p>
                   </div>
                 </div>
                 <Link to={`/part/${part.id}`} className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-primary transition-colors">

@@ -105,9 +105,10 @@ const ServiceScope: React.FC<{ user?: User }> = ({ user }) => {
 
         try {
             setIsSaving(true);
-            const { data: { user: authUser } } = await supabase.auth.getUser();
+            const { data, error: authError } = await supabase.auth.getUser();
+            const authUser = data?.user;
 
-            if (!authUser) throw new Error('Usuário não autenticado');
+            if (authError || !authUser) throw new Error('Usuário não autenticado ou sessão expirada');
 
             const { error } = await supabase
                 .from('service_scopes')
@@ -280,7 +281,7 @@ const ServiceScope: React.FC<{ user?: User }> = ({ user }) => {
                                 type="text"
                                 value={stepInput}
                                 onChange={(e) => setStepInput(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && addStep()}
+                                onKeyDown={(e) => e.key === 'Enter' && addStep()}
                                 placeholder="Descreva o passo..."
                                 className="flex-1 h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 text-sm"
                             />
@@ -390,7 +391,7 @@ const ServiceScope: React.FC<{ user?: User }> = ({ user }) => {
                                     type="text"
                                     value={aiQuery}
                                     onChange={(e) => setAiQuery(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && searchAiBestPractices()}
+                                    onKeyDown={(e) => e.key === 'Enter' && searchAiBestPractices()}
                                     placeholder="Buscar boas práticas..."
                                     className="w-full h-10 pl-3 pr-10 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:border-primary/50 transition-all"
                                 />

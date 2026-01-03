@@ -19,6 +19,8 @@ const PurchaseRequest: React.FC = () => {
   const [osType, setOsType] = useState('Ordem Corretiva');
   const [usageArea, setUsageArea] = useState('');
   const [projectNumber, setProjectNumber] = useState('');
+  const [assetNumber, setAssetNumber] = useState('');
+  const [estimatedValue, setEstimatedValue] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -100,7 +102,9 @@ const PurchaseRequest: React.FC = () => {
         os_number: osNumber,
         os_type: osType,
         usage_area: usageArea,
-        project_number: osType === 'Projeto' ? projectNumber : null
+        project_number: osType === 'Projeto' ? projectNumber : null,
+        asset_number: assetNumber,
+        estimated_value: estimatedValue
       }));
 
       const { error } = await supabase
@@ -214,6 +218,28 @@ const PurchaseRequest: React.FC = () => {
                   />
                 </div>
               )}
+
+              <div className="md:col-span-1">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nº do Ativo</label>
+                <input
+                  type="text"
+                  value={assetNumber}
+                  onChange={(e) => setAssetNumber(e.target.value)}
+                  placeholder="Ex: MAQ-001"
+                  className="w-full h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 text-sm focus:ring-primary"
+                />
+              </div>
+              <div className="md:col-span-1">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Valor Estimado (R$)</label>
+                <input
+                  type="number"
+                  value={estimatedValue}
+                  onChange={(e) => setEstimatedValue(parseFloat(e.target.value) || 0)}
+                  placeholder="0,00"
+                  step="0.01"
+                  className="w-full h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 text-sm focus:ring-primary"
+                />
+              </div>
             </div>
           </div>
 
@@ -361,13 +387,17 @@ const PurchaseRequest: React.FC = () => {
               </li>
               <li className="flex gap-3">
                 <span className="material-symbols-outlined text-amber-500 text-[20px]">warning</span>
-                <span>Requisições <strong>Urgentes</strong> são enviadas imediatamente para aprovação da gerência.</span>
+                <span>Todos os campos devem ser preenchidos para garantir agilidade para o setor de suprimentos.</span>
+              </li>
+              <li className="flex gap-3 pt-2 border-t border-slate-50 dark:border-slate-800">
+                <span className="material-symbols-outlined text-slate-400 text-[20px]">contact_support</span>
+                <span className="text-xs italic">Em caso de dúvidas, procurar por <strong>Bruno Cariello</strong></span>
               </li>
             </ul>
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 
