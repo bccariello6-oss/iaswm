@@ -1,14 +1,117 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MOCK_PARTS, MOCK_MOVEMENTS } from '../data';
+import { supabase } from '../lib/supabase';
+import { Part, Movement } from '../types';
 
 const PartDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState('history');
-  
-  const part = useMemo(() => MOCK_PARTS.find(p => p.id === id), [id]);
-  const movements = useMemo(() => MOCK_MOVEMENTS.filter(m => m.partId === id), [id]);
+  const [part, setPart] = useState<Part | null>(null);
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ quantity: 0, cost: 0, location: '' });
+
+  useEffect(() => {
+    if (id) {
+      fetchPartData();
+    }
+  }, [id]);
+
+  const fetchPartData = async () => {
+    try {
+      setLoading(true);
+      const { data: partData, error: partError } = await supabase
+        .from('parts')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (partError) throw partError;
+      setPart(partData as any);
+      setEditData({
+        quantity: partData.quantity,
+        cost: partData.cost,
+        location: partData.location || ''
+      });
+
+      const { data: moveData, error: moveError } = await supabase
+        .from('movements')
+        .select('*')
+        .eq('part_id', id)
+        .order('created_at', { ascending: false });
+
+      if (moveError) throw moveError;
+      setMovements(moveData.map(m => ({
+        ...m,
+        date: new Date(m.created_at).toLocaleDateString('pt-BR')
+      })) as any);
+
+    } catch (error) {
+      console.error('Error fetching part details:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    try {
+      const { error } = await supabase
+        .from('parts')
+        .update({
+          quantity: editData.quantity,
+          cost: editData.cost,
+          location: editData.location
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Log movement if quantity changed
+      if (part && editData.quantity !== part.quantity) {
+        await supabase.from('movements').insert({
+          part_id: id,
+          type: editData.quantity > part.quantity ? 'Entrada' : 'Saída',
+          quantity: Math.abs(editData.quantity - part.quantity),
+          responsible: 'Sistema',
+          ref: 'Ajuste Manual'
+        });
+
+        // Trigger Notification for Low Stock
+        if (editData.quantity === 0) {
+          await supabase.from('notifications').insert({
+            title: 'Peça Zerada!',
+            message: `O estoque de ${part.name} chegou a zero.`,
+            type: 'critical',
+            user_id: user?.id
+          });
+        } else if (editData.quantity <= (part.min_quantity || 0)) {
+          await supabase.from('notifications').insert({
+            title: 'Estoque Baixo',
+            message: `A peça ${part.name} atingiu o nível crítico (${editData.quantity}).`,
+            type: 'warning',
+            user_id: user?.id
+          });
+        }
+      }
+
+      alert('Dados atualizados!');
+      setIsEditing(false);
+      fetchPartData();
+    } catch (error: any) {
+      alert('Erro ao atualizar: ' + error.message);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   if (!part) {
     return <div className="p-10 text-center">Peça não encontrada.</div>;
@@ -30,8 +133,8 @@ const PartDetails: React.FC = () => {
         <div>
           <div className="flex flex-wrap items-center gap-3 mb-2">
             <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">{part.name}</h1>
-            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${part.quantity > part.minQuantity ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {part.quantity > 0 ? 'Disponível' : 'Indisponível'}
+            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase ${(part.quantity || 0) > (part.min_quantity || 0) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {(part.quantity || 0) > 0 ? 'Disponível' : 'Indisponível'}
             </span>
           </div>
           <p className="text-slate-500">
@@ -39,56 +142,91 @@ const PartDetails: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface-dark font-bold text-sm text-slate-700 dark:text-white hover:bg-slate-50 transition-colors flex items-center gap-2">
-            <span className="material-symbols-outlined text-[20px]">edit</span> Editar Peça
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="h-11 px-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface-dark font-bold text-sm text-slate-700 dark:text-white hover:bg-slate-50 transition-colors flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[20px]">{isEditing ? 'close' : 'edit'}</span> {isEditing ? 'Cancelar' : 'Editar Peça'}
           </button>
-          <button className="h-11 px-5 rounded-xl bg-primary font-bold text-sm text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors flex items-center gap-2">
+          <Link to="/requests" className="h-11 px-5 rounded-xl bg-primary font-bold text-sm text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors flex items-center gap-2">
             <span className="material-symbols-outlined text-[20px]">shopping_cart</span> Solicitar Compra
-          </button>
+          </Link>
         </div>
       </div>
+
+      {isEditing && (
+        <div className="mb-8 p-6 bg-primary/5 rounded-2xl border border-primary/20 grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
+          <div>
+            <label className="block text-xs font-bold text-primary uppercase mb-2">Quantidade em Estoque</label>
+            <input
+              type="number"
+              className="w-full h-11 px-4 rounded-xl border-primary/20 bg-white focus:ring-primary"
+              value={editData.quantity}
+              onChange={(e) => setEditData({ ...editData, quantity: parseInt(e.target.value) || 0 })}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-primary uppercase mb-2">Custo Unitário (R$)</label>
+            <input
+              type="number"
+              step="0.01"
+              className="w-full h-11 px-4 rounded-xl border-primary/20 bg-white focus:ring-primary"
+              value={editData.cost}
+              onChange={(e) => setEditData({ ...editData, cost: parseFloat(e.target.value) || 0 })}
+            />
+          </div>
+          <div className="flex flex-col justify-end gap-3 md:flex-row md:items-end">
+            <button
+              onClick={handleUpdate}
+              className="h-11 px-8 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/20 hover:bg-primary/90"
+            >
+              Salvar Alterações
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-             <p className="text-sm font-medium text-slate-500">Estoque Atual</p>
-             <div className="size-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center">
-               <span className="material-symbols-outlined text-[18px]">inventory_2</span>
-             </div>
+            <p className="text-sm font-medium text-slate-500">Estoque Atual</p>
+            <div className="size-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">inventory_2</span>
+            </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{part.quantity} <span className="text-base font-normal text-slate-400">{part.unit.toLowerCase()}.</span></p>
-          <p className="text-xs font-bold text-amber-600 mt-2">Mínimo: {part.minQuantity}</p>
+          <p className="text-3xl font-black text-slate-900 dark:text-white">{part.quantity} <span className="text-base font-normal text-slate-400">{part.unit?.toLowerCase() || 'un'}.</span></p>
+          <p className="text-xs font-bold text-amber-600 mt-2">Mínimo: {part.min_quantity}</p>
         </div>
         <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-             <p className="text-sm font-medium text-slate-500">Custo Unitário</p>
-             <div className="size-8 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 flex items-center justify-center">
-               <span className="material-symbols-outlined text-[18px]">payments</span>
-             </div>
+            <p className="text-sm font-medium text-slate-500">Custo Unitário</p>
+            <div className="size-8 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">payments</span>
+            </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">R$ {part.cost.toLocaleString('pt-BR')}</p>
-          <p className="text-xs text-slate-400 mt-2">Investimento: R$ {(part.cost * part.quantity).toLocaleString('pt-BR')}</p>
+          <p className="text-3xl font-black text-slate-900 dark:text-white">R$ {parseFloat(part.cost as any || 0).toLocaleString('pt-BR')}</p>
+          <p className="text-xs text-slate-400 mt-2">Investimento: R$ {(parseFloat(part.cost as any || 0) * (part.quantity || 0)).toLocaleString('pt-BR')}</p>
         </div>
         <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-             <p className="text-sm font-medium text-slate-500">Localização</p>
-             <div className="size-8 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 flex items-center justify-center">
-               <span className="material-symbols-outlined text-[18px]">location_on</span>
-             </div>
+            <p className="text-sm font-medium text-slate-500">Localização</p>
+            <div className="size-8 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">location_on</span>
+            </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{part.location}</p>
+          <p className="text-3xl font-black text-slate-900 dark:text-white">{part.location || 'N/A'}</p>
           <p className="text-xs text-slate-400 mt-2">Almoxarifado Central</p>
         </div>
         <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-             <p className="text-sm font-medium text-slate-500">Lead Time</p>
-             <div className="size-8 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 flex items-center justify-center">
-               <span className="material-symbols-outlined text-[18px]">schedule</span>
-             </div>
+            <p className="text-sm font-medium text-slate-500">Lead Time</p>
+            <div className="size-8 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">schedule</span>
+            </div>
           </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{part.leadTime} <span className="text-base font-normal text-slate-400">dias</span></p>
-          <p className="text-xs text-slate-400 mt-2">{part.supplier}</p>
+          <p className="text-3xl font-black text-slate-900 dark:text-white">{part.lead_time || 0} <span className="text-base font-normal text-slate-400">dias</span></p>
+          <p className="text-xs text-slate-400 mt-2">{part.supplier || 'Não informado'}</p>
         </div>
       </div>
 
@@ -97,9 +235,9 @@ const PartDetails: React.FC = () => {
         <div className="flex flex-col gap-6">
           {/* Product Image */}
           <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm aspect-square group">
-            <div 
+            <div
               className="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
-              style={{ backgroundImage: `url("${part.imageUrl || 'https://picsum.photos/seed/' + part.id + '/600/600'}")` }}
+              style={{ backgroundImage: `url("${part.image_url || 'https://picsum.photos/seed/' + part.id + '/600/600'}")` }}
             />
           </div>
 
@@ -109,20 +247,20 @@ const PartDetails: React.FC = () => {
               <span className="material-symbols-outlined text-primary">tune</span> Especificações
             </h3>
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
-               <div className="py-3 flex justify-between text-sm">
-                  <span className="text-slate-500">Fabricante</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-200">{part.manufacturer}</span>
-               </div>
-               <div className="py-3 flex justify-between text-sm">
-                  <span className="text-slate-500">Modelo</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-200">{part.model}</span>
-               </div>
-               {Object.entries(part.specs).map(([key, val]) => (
-                  <div key={key} className="py-3 flex justify-between text-sm">
-                    <span className="text-slate-500">{key}</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{val}</span>
-                  </div>
-               ))}
+              <div className="py-3 flex justify-between text-sm">
+                <span className="text-slate-500">Fabricante</span>
+                <span className="font-bold text-slate-700 dark:text-slate-200">{part.manufacturer || '-'}</span>
+              </div>
+              <div className="py-3 flex justify-between text-sm">
+                <span className="text-slate-500">Modelo</span>
+                <span className="font-bold text-slate-700 dark:text-slate-200">{part.model || '-'}</span>
+              </div>
+              {part.specs && Object.entries(part.specs).map(([key, val]) => (
+                <div key={key} className="py-3 flex justify-between text-sm">
+                  <span className="text-slate-500">{key}</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{val}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -131,18 +269,18 @@ const PartDetails: React.FC = () => {
         <div className="lg:col-span-2 flex flex-col gap-6">
           <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
             <div className="flex border-b border-slate-100 dark:border-slate-800">
-               <button 
-                  onClick={() => setActiveTab('history')}
-                  className={`px-6 py-4 text-sm font-bold transition-all ${activeTab === 'history' ? 'border-b-2 border-primary text-primary bg-primary/5' : 'text-slate-400 hover:bg-slate-50'}`}
-               >
-                 Histórico de Uso
-               </button>
-               <button 
-                  onClick={() => setActiveTab('docs')}
-                  className={`px-6 py-4 text-sm font-bold transition-all ${activeTab === 'docs' ? 'border-b-2 border-primary text-primary bg-primary/5' : 'text-slate-400 hover:bg-slate-50'}`}
-               >
-                 Documentos
-               </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`px-6 py-4 text-sm font-bold transition-all ${activeTab === 'history' ? 'border-b-2 border-primary text-primary bg-primary/5' : 'text-slate-400 hover:bg-slate-50'}`}
+              >
+                Histórico de Uso
+              </button>
+              <button
+                onClick={() => setActiveTab('docs')}
+                className={`px-6 py-4 text-sm font-bold transition-all ${activeTab === 'docs' ? 'border-b-2 border-primary text-primary bg-primary/5' : 'text-slate-400 hover:bg-slate-50'}`}
+              >
+                Documentos
+              </button>
             </div>
 
             <div className="p-6 flex-1">
@@ -170,7 +308,7 @@ const PartDetails: React.FC = () => {
                           </td>
                           <td className="py-4 font-bold">{move.type === 'Entrada' ? '+' : '-'}{move.quantity}</td>
                           <td className="py-4 text-slate-600 dark:text-slate-300">{move.responsible}</td>
-                          <td className="py-4 text-right font-bold text-primary">{move.ref}</td>
+                          <td className="py-4 text-right font-bold text-primary">{move.ref || '-'}</td>
                         </tr>
                       )) : (
                         <tr><td colSpan={5} className="py-10 text-center text-slate-400">Nenhuma movimentação registrada.</td></tr>
@@ -187,15 +325,6 @@ const PartDetails: React.FC = () => {
                     <div>
                       <p className="text-sm font-bold group-hover:text-primary transition-colors">Manual Técnico.pdf</p>
                       <p className="text-xs text-slate-400">2.4 MB · PDF</p>
-                    </div>
-                  </div>
-                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-primary transition-colors cursor-pointer group">
-                    <div className="size-10 rounded-lg bg-blue-100 text-primary flex items-center justify-center">
-                      <span className="material-symbols-outlined">verified</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold group-hover:text-primary transition-colors">Certificado Garantia.docx</p>
-                      <p className="text-xs text-slate-400">145 KB · DOCX</p>
                     </div>
                   </div>
                 </div>

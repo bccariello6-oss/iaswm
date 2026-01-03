@@ -1,7 +1,7 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { User } from '../types';
+import { User, Notification } from '../types';
+import { supabase } from '../lib/supabase';
 // @ts-ignore
 import swmLogo from '../assets/swm_logo.jpg';
 // @ts-ignore
@@ -16,15 +16,64 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+  useEffect(() => {
+    fetchNotifications();
+
+    // Subscribe to real-time notifications
+    const channel = supabase
+      .channel('notifications_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications'
+        },
+        (payload) => {
+          setNotifications(prev => [payload.new as Notification, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchNotifications = async () => {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (data) setNotifications(data);
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const markAsRead = async (id: string) => {
+    await supabase.from('notifications').update({ read: true }).eq('id', id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const markAllAsRead = async () => {
+    await supabase.from('notifications').update({ read: true }).eq('read', false);
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
 
   const navItems = [
     { label: 'Dashboard', icon: 'dashboard', path: '/' },
     { label: 'Inventário', icon: 'inventory_2', path: '/inventory' },
-    { label: 'Alertas', icon: 'notifications_active', path: '/alerts' },
-    { label: 'Requisições', icon: 'assignment', path: '/requests' },
-    { label: 'Relatórios', icon: 'description', path: '/reports' },
+    { label: 'Alertas', icon: 'notifications', path: '/alerts' },
+    { label: 'Requisições de Material', icon: 'description', path: '/requests' },
+    { label: 'Requisições de Serviço', icon: 'engineering', path: '/service-requests' },
+    { label: 'Escopo de Serviço', icon: 'assignment_turned_in', path: '/service-scope' },
+    { label: 'Relatórios', icon: 'insert_chart', path: '/reports' },
     { label: 'Usuários', icon: 'group', path: '/users' },
-    { label: 'Configurações', icon: 'settings', path: '/settings' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -38,9 +87,12 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       `}>
         <div className="flex flex-col h-full">
           {/* Logo Area & User Welcome */}
-          <div className="p-6 flex flex-col items-center justify-center border-b border-slate-100 dark:border-slate-800 gap-3">
-            <img src={swmLogo} alt="SWM Logo" className="h-16 w-auto object-contain" />
-            <div className="text-center">
+          <div className="p-8 flex flex-col items-center justify-center border-b border-slate-100 dark:border-slate-800 gap-4">
+            <div className="flex flex-col items-center gap-1">
+              <img src={swmLogo} alt="SWM Logo" className="h-20 w-auto object-contain" />
+              <p className="text-[10px] font-black text-primary tracking-[0.2em] uppercase">CSM SWM STN - BRASIL</p>
+            </div>
+            <div className="text-center mt-2">
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Bem-vindo,</p>
               <p className="text-sm font-black text-slate-700 dark:text-slate-200 leading-tight">{user.name}</p>
               <p className="text-xs font-medium text-slate-500 mt-0.5">{user.email}</p>
@@ -94,33 +146,95 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             <span className="material-symbols-outlined">{isMobileMenuOpen ? 'close' : 'menu'}</span>
           </button>
 
-          {/* Spacer / Breadcrumbs (Placeholder) */}
-          <div className="hidden md:block text-slate-400 text-sm">
-            {/* Pode adicionar breadcrumbs aqui no futuro */}
+          {/* Center Search Bar */}
+          <div className="hidden md:flex flex-1 max-w-md relative group mx-4">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors text-[20px]">search</span>
+            <input
+              type="text"
+              placeholder="Buscar materiais, ordens ou serviços..."
+              className="w-full h-11 pl-12 pr-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 text-sm focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-focus-within:opacity-100 transition-opacity">
+              <span className="px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-[10px] text-slate-400 font-bold bg-white dark:bg-slate-800">CTRL</span>
+              <span className="px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-[10px] text-slate-400 font-bold bg-white dark:bg-slate-800">K</span>
+            </div>
           </div>
 
           {/* Right Side: Actions & Profile */}
           <div className="flex items-center gap-6 ml-auto">
-            {/* Notification Bell */}
-            <button className="relative p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500">
-              <span className="material-symbols-outlined text-[24px]">notifications</span>
-              <span className="absolute top-2 right-2 size-2.5 bg-red-500 border-2 border-white dark:border-surface-dark rounded-full"></span>
-            </button>
+            {/* Notification Bell with Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                className="relative p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+              >
+                <span className="material-symbols-outlined text-[24px]">notifications</span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-2 right-2 size-2.5 bg-red-500 border-2 border-white dark:border-surface-dark rounded-full animate-pulse"></span>
+                )}
+              </button>
 
-            <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+              {isNotifOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsNotifOpen(false)}></div>
+                  <div className="absolute right-0 mt-4 w-80 bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl z-50 overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                      <h4 className="font-bold text-slate-900 dark:text-white">Notificações</h4>
+                      <button onClick={markAllAsRead} className="text-xs text-primary font-bold hover:underline">Limpar tudo</button>
+                    </div>
+                    <div className="max-h-[400px] overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400">
+                          <span className="material-symbols-outlined text-4xl mb-2">notifications_none</span>
+                          <p className="text-sm">Nenhuma notificação</p>
+                        </div>
+                      ) : (
+                        notifications.map(notif => (
+                          <div
+                            key={notif.id}
+                            onClick={() => markAsRead(notif.id)}
+                            className={`p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer group ${!notif.read ? 'bg-primary/5' : ''}`}
+                          >
+                            <div className="flex gap-3">
+                              <div className={`size-10 rounded-xl flex items-center justify-center shrink-0 ${notif.type === 'critical' ? 'bg-red-100 text-red-600' :
+                                notif.type === 'warning' ? 'bg-amber-100 text-amber-600' :
+                                  'bg-primary/10 text-primary'
+                                }`}>
+                                <span className="material-symbols-outlined text-[20px]">
+                                  {notif.type === 'critical' ? 'emergency' : notif.type === 'warning' ? 'warning' : 'info'}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-bold truncate ${notif.read ? 'text-slate-600 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>{notif.title}</p>
+                                <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{notif.message}</p>
+                                <p className="text-[10px] text-slate-400 mt-2">{new Date(notif.created_at).toLocaleString('pt-BR')}</p>
+                              </div>
+                              {!notif.read && <div className="size-2 rounded-full bg-primary mt-1 shrink-0"></div>}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 text-center">
+                      <Link to="/alerts" onClick={() => setIsNotifOpen(false)} className="text-xs font-bold text-slate-500 hover:text-primary">Ver todos os alertas</Link>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
-            {/* SWM Logo (Secondary placement if requested by "add to top right") */}
-            {/* Keeping it subtle or user might mean the sidebar one. I'll add the user profile here mostly. */}
+            <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-            {/* App Interaction: Nova Solicitação */}
-            <button className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all active:scale-95">
-              <span className="material-symbols-outlined text-[20px]">add_circle</span>
-              <span className="text-sm font-black uppercase tracking-wide">Nova Solicitação</span>
-            </button>
-
-            {/* Extra SWM Logo as requested "canto superior direito" */}
-            <img src={swmLogo} alt="SWM" className="h-8 w-auto object-contain hidden lg:block" />
-
+            <div className="flex items-center gap-3">
+              <Link to="/requests" className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-800 text-white shadow-lg hover:bg-slate-800 dark:hover:bg-slate-700 transition-all active:scale-95 group">
+                <span className="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-white transition-colors">inventory_2</span>
+                <span className="text-[11px] font-black uppercase tracking-widest">Novo Material</span>
+              </Link>
+              <Link to="/service-requests" className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95 group">
+                <span className="material-symbols-outlined text-[18px] group-hover:rotate-12 transition-transform">engineering</span>
+                <span className="text-[11px] font-black uppercase tracking-widest">Novo Serviço</span>
+              </Link>
+            </div>
           </div>
         </header>
 

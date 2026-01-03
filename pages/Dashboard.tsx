@@ -1,12 +1,55 @@
-
-import React from 'react';
-import { MOCK_PARTS, MOCK_REQUESTS } from '../data';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
+import { Part, PurchaseRequest } from '../types';
 
 const Dashboard: React.FC = () => {
-  const criticalCount = MOCK_PARTS.filter(p => p.quantity === 0).length;
-  const lowStockCount = MOCK_PARTS.filter(p => p.quantity > 0 && p.quantity <= p.minQuantity).length;
-  const totalValue = MOCK_PARTS.reduce((acc, part) => acc + (part.cost * part.quantity), 0);
+  const [parts, setParts] = useState<Part[]>([]);
+  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const { data: partsData, error: partsError } = await supabase
+        .from('parts')
+        .select('*');
+
+      const { data: requestsData, error: requestsError } = await supabase
+        .from('purchase_requests')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (partsError) throw partsError;
+      if (requestsError) throw requestsError;
+
+      setParts(partsData as any);
+      setRequests(requestsData.map(req => ({
+        ...req,
+        date: new Date(req.created_at).toLocaleDateString('pt-BR')
+      })) as any);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const criticalCount = parts.filter(p => (p.quantity || 0) === 0).length;
+  const lowStockCount = parts.filter(p => (p.quantity || 0) > 0 && (p.quantity || 0) <= (p.min_quantity || 0)).length;
+  const totalValue = parts.reduce((acc, part) => acc + ((part.cost || 0) * (part.quantity || 0)), 0);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 md:p-8 lg:p-10 max-w-7xl">
@@ -23,7 +66,7 @@ const Dashboard: React.FC = () => {
             <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+12%</span>
           </div>
           <p className="text-sm font-medium text-slate-500">Total em Peças</p>
-          <p className="text-2xl font-black text-slate-900 dark:text-white">{MOCK_PARTS.length}</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-white">{parts.length}</p>
         </div>
         <div className="bg-white dark:bg-surface-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -59,7 +102,7 @@ const Dashboard: React.FC = () => {
             <Link to="/requests" className="text-xs font-bold text-primary hover:underline">Ver todas</Link>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {MOCK_REQUESTS.map(req => (
+            {requests.length > 0 ? requests.map(req => (
               <div key={req.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group">
                 <div className="flex justify-between items-start mb-1">
                   <div className="flex items-center gap-3">
@@ -67,8 +110,8 @@ const Dashboard: React.FC = () => {
                       <span className="material-symbols-outlined text-[18px]">assignment</span>
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{req.partName}</p>
-                      <p className="text-xs text-slate-500">#{req.id}</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[200px]">{req.partName}</p>
+                      <p className="text-xs text-slate-500">#{req.sku}</p>
                     </div>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${req.status === 'Aprovado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
@@ -81,7 +124,9 @@ const Dashboard: React.FC = () => {
                   <span className="material-symbols-outlined text-[18px] text-slate-300 group-hover:text-primary transition-colors">arrow_forward</span>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="p-8 text-center text-slate-400 text-sm">Nenhuma requisição encontrada.</div>
+            )}
           </div>
         </div>
 
@@ -92,7 +137,7 @@ const Dashboard: React.FC = () => {
             <Link to="/alerts" className="text-xs font-bold text-primary hover:underline">Ver todos</Link>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {MOCK_PARTS.filter(p => p.quantity <= p.minQuantity).slice(0, 5).map(part => (
+            {parts.filter(p => (p.quantity || 0) <= (p.minQuantity || 0)).slice(0, 5).map(part => (
               <div key={part.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className={`size-10 rounded flex items-center justify-center ${part.quantity === 0 ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-500'}`}>

@@ -6,6 +6,8 @@ import Inventory from './pages/Inventory';
 import Alerts from './pages/Alerts';
 import PartDetails from './pages/PartDetails';
 import PurchaseRequest from './pages/PurchaseRequest';
+import ServiceRequest from './pages/ServiceRequest';
+import ServiceScope from './pages/ServiceScope';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Login from './pages/Login';
@@ -18,11 +20,19 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'login' | 'register'>('login');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
     let mounted = true;
 
-    // Listen for changes
+    // Monitor connectivity
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
@@ -55,8 +65,26 @@ const App: React.FC = () => {
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, [currentUser]);
+
+  // Connection status banner component
+  const ConnectionStatus = () => {
+    if (isOnline) return null;
+    return (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
+        <div className="bg-red-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-red-500/50 backdrop-blur-sm">
+          <span className="material-symbols-outlined animate-pulse">cloud_off</span>
+          <div>
+            <p className="text-sm font-black uppercase tracking-wider">Modo Offline</p>
+            <p className="text-[10px] opacity-80">Tentando reconectar ao Supabase...</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const fetchProfile = async (userId: string, email?: string) => {
     try {
@@ -72,9 +100,9 @@ const App: React.FC = () => {
         setCurrentUser({
           id: data.id,
           name: data.full_name || data.username || 'Usuário',
-          email: email || data.username || '',
-          role: data.role as any || 'Técnico',
-          status: 'Ativo',
+          email: data.email || email || data.username || '',
+          role: data.role as any || 'Visualização',
+          status: data.status as any || 'Ativo',
           lastAccess: 'Agora',
           avatarUrl: data.avatar_url || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
         });
@@ -118,6 +146,7 @@ const App: React.FC = () => {
 
   return (
     <Router>
+      <ConnectionStatus />
       <Layout user={currentUser} onLogout={handleLogout}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
@@ -125,9 +154,10 @@ const App: React.FC = () => {
           <Route path="/part/:id" element={<PartDetails />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/requests" element={<PurchaseRequest />} />
+          <Route path="/service-requests" element={<ServiceRequest />} />
+          <Route path="/service-scope" element={<ServiceScope />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/users" element={<Users />} />
-          <Route path="/settings" element={<div className="p-10 text-center font-bold">Configurações (Em Breve)</div>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

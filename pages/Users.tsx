@@ -1,16 +1,90 @@
-
-import React, { useState } from 'react';
-import { MOCK_USERS } from '../data';
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
 import { User } from '../types';
 
 const Users: React.FC = () => {
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const toggleStatus = (id: string) => {
-    setUsers(prev => prev.map(u => 
-      u.id === id ? { ...u, status: u.status === 'Ativo' ? 'Inativo' : 'Ativo' } : u
-    ));
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('full_name', { ascending: true });
+
+      if (error) throw error;
+
+      if (data) {
+        setUsers(data.map(profile => ({
+          id: profile.id,
+          name: profile.full_name || 'Usuário Sem Nome',
+          email: profile.email || 'N/A',
+          role: profile.role as any || 'Visualização',
+          status: profile.status as any || 'Ativo',
+          lastAccess: profile.updated_at ? new Date(profile.updated_at).toLocaleDateString() : 'N/A',
+          avatarUrl: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'U')}&background=random`,
+          department: profile.department
+        })));
+      }
+    } catch (err) {
+      console.error('Erro ao buscar usuários:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const toggleStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'Ativo' ? 'Inativo' : 'Ativo';
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: newStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: newStatus as any } : u));
+    } catch (err) {
+      console.error('Erro ao alternar status:', err);
+    }
   };
+
+  const deleteUser = async (id: string, name: string) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o perfil de "${name}"? Esta ação não pode ser desfeita.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'Inativo' as any } : u)); // Soft delete/Deactivate or really delete? User said "Excluir".
+      // Actually deleting from UI too:
+      setUsers(prev => prev.filter(u => u.id !== id));
+      alert(`Perfil de ${name} excluído com sucesso.`);
+    } catch (err) {
+      console.error('Erro ao excluir usuário:', err);
+      alert('Erro ao excluir usuário. Verifique as permissões.');
+    }
+  };
+
+  const handleManage = (name: string) => {
+    alert(`Gerenciamento avançado para ${name} (Configurações de segurança e logs) em desenvolvimento.`);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 md:p-8 lg:p-10 max-w-7xl">
@@ -19,8 +93,11 @@ const Users: React.FC = () => {
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">Gestão de Usuários</h1>
           <p className="text-slate-500 mt-2">Controle de acesso e permissões da equipe de manutenção.</p>
         </div>
-        <button className="h-11 px-5 rounded-xl bg-primary font-bold text-sm text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors flex items-center gap-2">
-          <span className="material-symbols-outlined text-[20px]">add</span> Adicionar Usuário
+        <button
+          onClick={() => fetchUsers()}
+          className="h-11 px-5 rounded-xl bg-primary font-bold text-sm text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors flex items-center gap-2 group"
+        >
+          <span className={`material-symbols-outlined text-[20px] ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`}>sync</span> Sincronizar
         </button>
       </div>
 
@@ -29,11 +106,11 @@ const Users: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Usuário</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Usuário Real (Supabase)</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Função</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo de Acesso</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Último Acesso</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Última Ativ.</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
@@ -45,22 +122,29 @@ const Users: React.FC = () => {
                       <div className="size-10 rounded-full bg-cover bg-center ring-2 ring-slate-100 dark:ring-slate-700" style={{ backgroundImage: `url("${user.avatarUrl}")` }} />
                       <div>
                         <p className="text-sm font-bold text-slate-900 dark:text-white">{user.name}</p>
-                        <p className="text-[10px] text-slate-400 font-mono uppercase">ID: {user.id.padStart(4, '0')}</p>
+                        <p className="text-[10px] text-slate-400 font-mono uppercase">UUID: {user.id.substring(0, 8)}...</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{user.email}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400 font-medium">{user.email}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      user.role === 'Admin' ? 'bg-blue-50 text-blue-700' : user.role === 'Gerente' ? 'bg-purple-50 text-purple-700' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {user.role}
-                    </span>
+                    <select
+                      value={user.role}
+                      onChange={(e) => updateRole(user.id, e.target.value)}
+                      className={`text-[10px] font-bold uppercase rounded px-2 py-1 bg-transparent border-0 cursor-pointer focus:ring-0 ${user.role === 'Administrador' ? 'text-primary' : user.role === 'Edição' ? 'text-blue-600' : 'text-slate-500'
+                        }`}
+                    >
+                      <option value="Administrador">Administrador</option>
+                      <option value="Edição">Edição</option>
+                      <option value="Visualização">Visualização</option>
+                      <option value="Gerente">Gerente</option>
+                      <option value="Técnico">Técnico</option>
+                    </select>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <button 
-                        onClick={() => toggleStatus(user.id)}
+                      <button
+                        onClick={() => toggleStatus(user.id, user.status)}
                         className={`w-10 h-5 rounded-full relative transition-all ${user.status === 'Ativo' ? 'bg-primary' : 'bg-slate-200 dark:bg-slate-700'}`}
                       >
                         <div className={`size-4 rounded-full bg-white absolute top-0.5 transition-all shadow-sm ${user.status === 'Ativo' ? 'left-[22px]' : 'left-0.5'}`} />
@@ -70,14 +154,22 @@ const Users: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-500">{user.lastAccess}</td>
                   <td className="px-6 py-4 text-right">
-                     <div className="flex items-center justify-end gap-1">
-                        <button className="p-2 rounded-lg text-slate-400 hover:text-primary hover:bg-primary/5 transition-colors">
-                          <span className="material-symbols-outlined text-[18px]">edit</span>
-                        </button>
-                        <button className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                          <span className="material-symbols-outlined text-[18px]">delete</span>
-                        </button>
-                     </div>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => handleManage(user.name)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-primary hover:bg-primary/5 transition-colors"
+                        title="Gerenciar Conta"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">manage_accounts</span>
+                      </button>
+                      <button
+                        onClick={() => deleteUser(user.id, user.name)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Excluir Perfil"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

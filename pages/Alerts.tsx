@@ -1,27 +1,68 @@
-
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { MOCK_PARTS } from '../data';
-import { PartStatus } from '../types';
+import { supabase } from '../lib/supabase';
+import { Part } from '../types';
 
 const Alerts: React.FC = () => {
   const navigate = useNavigate();
+  const [parts, setParts] = useState<Part[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetchAlertParts();
+  }, []);
+
+  const fetchAlertParts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('parts')
+        .select('*');
+
+      if (error) throw error;
+      if (data) setParts(data as any);
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const alertParts = useMemo(() => {
-    return MOCK_PARTS.filter(p => p.quantity <= p.minQuantity)
+    return parts.filter(p => p.quantity <= (p.min_quantity || 0))
       .sort((a, b) => {
-        // Ordenar críticos (0) primeiro
         if (a.quantity === 0 && b.quantity !== 0) return -1;
         if (a.quantity !== 0 && b.quantity === 0) return 1;
         return a.quantity - b.quantity;
       });
-  }, []);
+  }, [parts]);
 
   const criticalCount = alertParts.filter(p => p.quantity === 0).length;
   const lowStockCount = alertParts.filter(p => p.quantity > 0).length;
 
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const handleBulkBuy = () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds).join(',');
+    navigate(`/requests?partIds=${ids}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto p-6 md:p-8 lg:p-10 max-w-7xl font-display">
+    <div className="container mx-auto p-6 md:p-8 lg:p-10 max-w-7xl font-display relative">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
         <div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
@@ -32,13 +73,20 @@ const Alerts: React.FC = () => {
             Monitoramento em tempo real de itens que atingiram o ponto de ressuprimento ou estão indisponíveis.
           </p>
         </div>
-        <button 
-          onClick={() => navigate('/requests')}
-          className="h-11 px-6 rounded-xl bg-primary font-bold text-sm text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
-        >
-          <span className="material-symbols-outlined text-[20px]">add_shopping_cart</span> Nova Requisição Global
-        </button>
       </div>
+
+      {/* Floating Bulk Action */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-bounce-in">
+          <button
+            onClick={handleBulkBuy}
+            className="flex items-center gap-3 px-8 py-4 bg-primary text-white rounded-2xl shadow-2xl shadow-primary/40 font-black uppercase tracking-wider transform transition-all hover:scale-105 active:scale-95"
+          >
+            <span className="material-symbols-outlined">shopping_cart_checkout</span>
+            Solicitar Selecionados ({selectedIds.size})
+          </button>
+        </div>
+      )}
 
       {/* Stats Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
@@ -68,26 +116,38 @@ const Alerts: React.FC = () => {
             </div>
           </div>
           <p className="text-xs text-amber-600 font-bold mt-4 flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px]">info</span> Itens abaixo da quantidade mínima de segurança
+            <span className="material-symbols-outlined text-[14px]">info</span> Itens abaixo da quantidade mínima
           </p>
         </div>
       </div>
 
       {/* Alerts List */}
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4 pb-24">
         {alertParts.length > 0 ? (
           alertParts.map((part) => (
-            <div 
-              key={part.id} 
-              className={`bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all overflow-hidden group`}
+            <div
+              key={part.id}
+              className={`bg-white dark:bg-surface-dark rounded-2xl border transition-all overflow-hidden group flex items-stretch ${selectedIds.has(part.id)
+                ? 'border-primary ring-2 ring-primary/20 shadow-lg'
+                : 'border-slate-200 dark:border-slate-800 shadow-sm'
+                }`}
             >
-              <div className="p-5 flex flex-col lg:flex-row items-center gap-6">
-                {/* Visual Indicator */}
+              {/* Checkbox Overlay/Side */}
+              <div
+                onClick={() => toggleSelect(part.id)}
+                className={`w-14 flex items-center justify-center cursor-pointer transition-colors ${selectedIds.has(part.id) ? 'bg-primary/10 text-primary' : 'bg-slate-50/50 dark:bg-slate-800/30 text-slate-300 hover:bg-slate-100'
+                  }`}
+              >
+                <span className="material-symbols-outlined text-[24px]">
+                  {selectedIds.has(part.id) ? 'check_box' : 'check_box_outline_blank'}
+                </span>
+              </div>
+
+              <div className="p-5 flex-1 flex flex-col lg:flex-row items-center gap-6">
                 <div className={`size-16 rounded-2xl flex items-center justify-center shrink-0 ${part.quantity === 0 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
                   <span className="material-symbols-outlined text-[32px]">{part.quantity === 0 ? 'dangerous' : 'history_toggle_off'}</span>
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 text-center lg:text-left">
                   <div className="flex flex-col lg:flex-row lg:items-center gap-2 mb-1">
                     <h3 className="text-lg font-black text-slate-900 dark:text-white">{part.name}</h3>
@@ -96,33 +156,27 @@ const Alerts: React.FC = () => {
                   <div className="flex flex-wrap justify-center lg:justify-start gap-x-4 gap-y-1 text-sm">
                     <span className="text-slate-500 font-medium">Categoria: <span className="text-slate-900 dark:text-slate-300 font-bold">{part.category}</span></span>
                     <span className="text-slate-500 font-medium">Local: <span className="text-slate-900 dark:text-slate-300 font-bold">{part.location}</span></span>
-                    <span className="text-slate-500 font-medium">Fornecedor: <span className="text-slate-900 dark:text-slate-300 font-bold">{part.supplier}</span></span>
                   </div>
                 </div>
 
-                {/* Status & Quantity */}
                 <div className="flex flex-col items-center lg:items-end gap-1 px-6 border-x border-slate-100 dark:border-slate-800 shrink-0">
                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Estoque Atual</p>
                   <div className="flex items-baseline gap-1">
                     <span className={`text-3xl font-black ${part.quantity === 0 ? 'text-red-600' : 'text-amber-600'}`}>{part.quantity}</span>
-                    <span className="text-slate-400 font-bold">/ {part.minQuantity} {part.unit}</span>
+                    <span className="text-slate-400 font-bold">/ {part.min_quantity} {part.unit}</span>
                   </div>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${part.quantity === 0 ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'}`}>
-                    {part.quantity === 0 ? 'Status Crítico' : 'Baixo Estoque'}
-                  </span>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-3 shrink-0">
-                  <Link 
+                  <Link
                     to={`/part/${part.id}`}
                     className="h-12 px-5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2"
                   >
                     <span className="material-symbols-outlined text-[20px]">visibility</span> Detalhes
                   </Link>
-                  <Link 
-                    to={`/requests?partId=${part.id}`}
-                    className="h-12 px-5 rounded-xl bg-[#0018a8] text-white font-bold text-sm hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2"
+                  <Link
+                    to={`/requests?partIds=${part.id}`}
+                    className="h-12 px-5 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
                   >
                     <span className="material-symbols-outlined text-[20px]">shopping_cart</span> Comprar
                   </Link>
@@ -136,20 +190,14 @@ const Alerts: React.FC = () => {
               <span className="material-symbols-outlined text-[48px] fill">check_circle</span>
             </div>
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Tudo em conformidade!</h2>
-            <p className="text-slate-500 max-w-sm">
-              Não há alertas ativos no momento. Todas as peças estão com níveis de estoque acima da margem de segurança.
-            </p>
-            <button 
-              onClick={() => navigate('/inventory')}
-              className="mt-8 text-primary font-bold hover:underline"
-            >
-              Voltar ao Inventário Geral
-            </button>
+            <p className="text-slate-500 max-w-sm">Não há alertas ativos no momento.</p>
+            <button onClick={() => navigate('/inventory')} className="mt-8 text-primary font-bold hover:underline">Voltar ao Inventário Geral</button>
           </div>
         )}
       </div>
     </div>
   );
 };
+
 
 export default Alerts;

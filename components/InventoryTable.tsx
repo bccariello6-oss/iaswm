@@ -12,7 +12,7 @@ const InventoryTable: React.FC<InventoryTableProps> = ({ parts }) => {
 
   const getStatusInfo = (part: Part) => {
     if (part.quantity === 0) return { label: PartStatus.CRITICAL, color: 'text-red-700 dark:text-red-400', bg: 'bg-red-500', pulse: true };
-    if (part.quantity <= part.minQuantity) return { label: PartStatus.LOW_STOCK, color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50', pulse: false };
+    if (part.quantity <= part.min_quantity) return { label: PartStatus.LOW_STOCK, color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50', pulse: false };
     return { label: PartStatus.IN_STOCK, color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-500', pulse: false };
   };
 
@@ -35,8 +35,8 @@ const InventoryTable: React.FC<InventoryTableProps> = ({ parts }) => {
             {parts.map((part) => {
               const status = getStatusInfo(part);
               return (
-                <tr 
-                  key={part.id} 
+                <tr
+                  key={part.id}
                   className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
                   onClick={() => navigate(`/part/${part.id}`)}
                 >
@@ -52,7 +52,7 @@ const InventoryTable: React.FC<InventoryTableProps> = ({ parts }) => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <span className={`text-sm font-bold ${part.quantity <= part.minQuantity ? 'text-amber-600' : 'text-slate-700 dark:text-slate-200'}`}>
+                    <span className={`text-sm font-bold ${part.quantity <= part.min_quantity ? 'text-amber-600' : 'text-slate-700 dark:text-slate-200'}`}>
                       {part.quantity}{part.unit === 'L' ? 'L' : ''}
                     </span>
                   </td>
@@ -60,7 +60,7 @@ const InventoryTable: React.FC<InventoryTableProps> = ({ parts }) => {
                     {part.location}
                   </td>
                   <td className="px-6 py-4 text-right text-sm text-slate-500">
-                    {part.minQuantity}
+                    {part.min_quantity}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1.5">
@@ -69,9 +69,9 @@ const InventoryTable: React.FC<InventoryTableProps> = ({ parts }) => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <button 
-                        className="text-slate-400 hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/part/${part.id}`); }}
+                    <button
+                      className="text-slate-400 hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/part/${part.id}`); }}
                     >
                       <span className="material-symbols-outlined text-[20px]">edit</span>
                     </button>
