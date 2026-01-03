@@ -149,13 +149,13 @@ const App: React.FC = () => {
       <ConnectionStatus />
       <Layout user={currentUser} onLogout={handleLogout}>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/escopo" element={<ServiceScope user={currentUser} />} />
+          <Route path="/" element={<Dashboard user={currentUser} />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/part/:id" element={<PartDetails />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/requests" element={<PurchaseRequest />} />
           <Route path="/service-requests" element={<ServiceRequest />} />
-          <Route path="/service-scope" element={<ServiceScope />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/users" element={<Users />} />
           <Route path="*" element={<Navigate to="/" replace />} />

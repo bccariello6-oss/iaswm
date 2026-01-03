@@ -67,7 +67,7 @@ const Alerts: React.FC = () => {
         <div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
             <span className="material-symbols-outlined text-red-600 text-[40px] fill">notifications_active</span>
-            Alertas de Estoque
+            Alertas de Reposição
           </h1>
           <p className="text-slate-500 mt-2 max-w-2xl">
             Monitoramento em tempo real de itens que atingiram o ponto de ressuprimento ou estão indisponíveis.

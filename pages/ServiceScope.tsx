@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { User } from '../types';
 
 interface ScopeStep {
     id: string;
     text: string;
 }
 
-const ServiceScope: React.FC = () => {
+const ServiceScope: React.FC<{ user?: User }> = ({ user }) => {
     const navigate = useNavigate();
 
     // Form State
@@ -19,11 +21,14 @@ const ServiceScope: React.FC = () => {
     const [steps, setSteps] = useState<ScopeStep[]>([]);
     const [safetyNorms, setSafetyNorms] = useState('');
     const [documentation, setDocumentation] = useState('');
+    const [images, setImages] = useState<string[]>([]);
     const [isExporting, setIsExporting] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // AI Insights State
     const [aiInsights, setAiInsights] = useState<string[]>([]);
     const [isAiLoading, setIsAiLoading] = useState(false);
+    const [aiQuery, setAiQuery] = useState('');
 
     // Simulated AI Logic
     useEffect(() => {
@@ -92,6 +97,103 @@ const ServiceScope: React.FC = () => {
         }, 500);
     };
 
+    const handleSaveAndPrint = async () => {
+        if (!title.trim()) {
+            alert('Por favor, insira um título para o escopo.');
+            return;
+        }
+
+        try {
+            setIsSaving(true);
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+
+            if (!authUser) throw new Error('Usuário não autenticado');
+
+            const { error } = await supabase
+                .from('service_scopes')
+                .insert([{
+                    title,
+                    date: date || null,
+                    location,
+                    service_type: serviceType,
+                    suppliers,
+                    steps,
+                    safety_norms: safetyNorms,
+                    documentation,
+                    images,
+                    user_id: authUser.id,
+                    status: 'Finalizado'
+                }]);
+
+            if (error) throw error;
+
+            alert('Escopo salvo com sucesso no banco de dados!');
+            handleExport();
+        } catch (err) {
+            console.error('Erro ao salvar escopo:', err);
+            alert('Erro ao salvar no banco de dados. Tentando imprimir apenas...');
+            handleExport();
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const searchAiBestPractices = async () => {
+        if (!aiQuery.trim()) return;
+
+        setIsAiLoading(true);
+        // Simulating artificial intelligence "web search" delay
+        setTimeout(() => {
+            const query = aiQuery.toLowerCase();
+            let newInsights = [...aiInsights];
+
+            if (query.includes('rolamento')) {
+                newInsights = [
+                    'WEB FOUND: Utilizar aquecedor por indução para montagem.',
+                    'PRÁTICA: Nunca bater diretamente no anel interno.',
+                    'NORMA: Verificar folga radial conforme catálogo C3/C4.',
+                    'DICA: Limpeza rigorosa do alojamento antes da instalação.'
+                ];
+            } else if (query.includes('solda') || query.includes('soldagem')) {
+                newInsights = [
+                    'WEB FOUND: AWS D1.1 - Código de Soldagem Estrutural.',
+                    'PRÁTICA: Controle de temperatura de pré-aquecimento.',
+                    'NORMAS: NR-18 e NR-34 para trabalhos a quente.',
+                    'CHECK: Ensaio de Líquido Penetrante (LP) pós-solda.'
+                ];
+            } else {
+                newInsights = [
+                    `Resultado para "${aiQuery}":`,
+                    '1. Verificar compatibilidade de materiais.',
+                    '2. Isolar energias (LOTO) se aplicável.',
+                    '3. Consultar manual original do fabricante.',
+                    '4. Registrar fotos do "antes" e "depois".'
+                ];
+            }
+
+            setAiInsights(newInsights);
+            setIsAiLoading(false);
+            setAiQuery('');
+        }, 1500);
+    };
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files) return;
+
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImages(prev => [...prev, reader.result as string]);
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const removeImage = (index: number) => {
+        setImages(prev => prev.filter((_, i) => i !== index));
+    };
+
     return (
         <div className="flex flex-col lg:flex-row gap-8 min-h-full">
             {/* Main Form Area */}
@@ -105,7 +207,7 @@ const ServiceScope: React.FC = () => {
                         onClick={handleExport}
                         className="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-white font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700 print:hidden"
                     >
-                        <span className="material-symbols-outlined text-[20px]">description</span> Exportar PDF
+                        <span className="material-symbols-outlined text-[20px]">print</span> Imprimir Escopo
                     </button>
                 </div>
 
@@ -232,6 +334,35 @@ const ServiceScope: React.FC = () => {
                             className="w-full h-32 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 p-4 text-sm"
                         />
                     </div>
+
+                    {/* Photo Upload Section */}
+                    <div className="md:col-span-12 mt-10">
+                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary size-5 flex items-center justify-center">photo_camera</span> Fotos e Anexos Visuais
+                        </label>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            {images.map((img, idx) => (
+                                <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 group">
+                                    <img src={img} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
+                                    <button
+                                        onClick={() => removeImage(idx)}
+                                        className="absolute top-2 right-2 size-8 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">close</span>
+                                    </button>
+                                </div>
+                            ))}
+                            <label className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group print:hidden">
+                                <span className="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors text-[32px]">add_a_photo</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Adicionar Foto</span>
+                                <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+                            </label>
+                        </div>
+                        {images.length === 0 && (
+                            <p className="mt-4 text-xs text-slate-400 italic">Nenhuma foto anexada ao escopo.</p>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -253,6 +384,23 @@ const ServiceScope: React.FC = () => {
                         </div>
 
                         <div className="space-y-4">
+                            {/* AI Search Input */}
+                            <div className="relative mb-4">
+                                <input
+                                    type="text"
+                                    value={aiQuery}
+                                    onChange={(e) => setAiQuery(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && searchAiBestPractices()}
+                                    placeholder="Buscar boas práticas..."
+                                    className="w-full h-10 pl-3 pr-10 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:border-primary/50 transition-all"
+                                />
+                                <button
+                                    onClick={searchAiBestPractices}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-white transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">search</span>
+                                </button>
+                            </div>
                             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                                 <p className="text-[10px] text-primary font-bold uppercase tracking-wider mb-2">Contexto:</p>
                                 <p className="text-xs text-slate-300 font-medium">Você está criando um escopo para <span className="text-white font-bold uppercase">{serviceType}</span>.</p>
@@ -283,10 +431,12 @@ const ServiceScope: React.FC = () => {
 
                 {/* Global Action */}
                 <button
-                    onClick={() => alert('Escopo salvo com sucesso!')}
-                    className="w-full h-14 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
+                    onClick={handleSaveAndPrint}
+                    disabled={isSaving}
+                    className="w-full h-14 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs disabled:opacity-50 disabled:scale-100"
                 >
-                    <span className="material-symbols-outlined">save</span> Salvar Escopo
+                    <span className="material-symbols-outlined">{isSaving ? 'sync' : 'save'}</span>
+                    {isSaving ? 'Salvando...' : 'Salvar Escopo e Gerar PDF'}
                 </button>
             </aside>
         </div>

@@ -68,10 +68,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const navItems = [
     { label: 'Dashboard', icon: 'dashboard', path: '/' },
     { label: 'Inventário', icon: 'inventory_2', path: '/inventory' },
-    { label: 'Alertas', icon: 'notifications', path: '/alerts' },
+    { label: 'Alertas de Reposição', icon: 'notifications', path: '/alerts' },
     { label: 'Requisições de Material', icon: 'description', path: '/requests' },
     { label: 'Requisições de Serviço', icon: 'engineering', path: '/service-requests' },
-    { label: 'Escopo de Serviço', icon: 'assignment_turned_in', path: '/service-scope' },
+    { label: 'Escopo de Serviço', icon: 'assignment_turned_in', path: '/escopo' },
     { label: 'Relatórios', icon: 'insert_chart', path: '/reports' },
     { label: 'Usuários', icon: 'group', path: '/users' },
   ];
@@ -110,15 +110,20 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
                   ${isActive(item.path)
                     ? 'bg-primary/10 text-primary font-bold shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}
+                    : item.path === '/alerts' && unreadCount > 0
+                      ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 animate-pulse font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}
                 `}
               >
-                <span className={`material-symbols-outlined text-[20px] ${isActive(item.path) ? 'fill-1' : ''}`}>
+                <span className={`material-symbols-outlined text-[20px] ${isActive(item.path) ? 'fill-1' : ''} ${(item.path === '/alerts' && unreadCount > 0) ? 'animate-bounce' : ''}`}>
                   {item.icon}
                 </span>
                 <span className="text-sm font-medium">{item.label}</span>
                 {isActive(item.path) && (
                   <span className="ml-auto size-1.5 rounded-full bg-primary"></span>
+                )}
+                {item.path === '/alerts' && unreadCount > 0 && (
+                  <span className="ml-auto px-2 py-0.5 rounded-full bg-red-600 text-[10px] text-white font-black">{unreadCount}</span>
                 )}
               </Link>
             ))}
