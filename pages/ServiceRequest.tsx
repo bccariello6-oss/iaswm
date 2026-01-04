@@ -385,7 +385,7 @@ const ServiceRequest: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </div >
+        </div>
     );
 };
 
