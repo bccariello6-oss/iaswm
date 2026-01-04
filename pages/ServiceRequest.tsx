@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { generateRequestExcel } from '../lib/excel';
 
 interface ServiceItem {
     code: string;
     description: string;
     quantity: number;
     unit: string;
+    estimatedValue: number;
 }
 
 const ServiceRequest: React.FC = () => {
@@ -18,7 +20,6 @@ const ServiceRequest: React.FC = () => {
     const [usageArea, setUsageArea] = useState('');
     const [projectNumber, setProjectNumber] = useState('');
     const [assetNumber, setAssetNumber] = useState('');
-    const [estimatedValue, setEstimatedValue] = useState<number>(0);
     const [priority, setPriority] = useState<'Baixa' | 'Normal' | 'Urgente'>('Normal');
     const [justification, setJustification] = useState('');
 
@@ -27,6 +28,7 @@ const ServiceRequest: React.FC = () => {
     const [currentDescription, setCurrentDescription] = useState('');
     const [currentQuantity, setCurrentQuantity] = useState(1);
     const [currentUnit, setCurrentUnit] = useState('UN');
+    const [currentEstimatedValue, setCurrentEstimatedValue] = useState<number>(0);
 
     // List state
     const [services, setServices] = useState<ServiceItem[]>([]);
@@ -42,12 +44,14 @@ const ServiceRequest: React.FC = () => {
             code: currentCode,
             description: currentDescription,
             quantity: currentQuantity,
-            unit: currentUnit
+            unit: currentUnit,
+            estimatedValue: currentEstimatedValue
         }]);
 
         // Reset builder fields
         setCurrentDescription('');
         setCurrentQuantity(1);
+        setCurrentEstimatedValue(0);
     };
 
     const removeService = (index: number) => {
@@ -75,6 +79,28 @@ const ServiceRequest: React.FC = () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
 
+            // Calculate total estimated value from items
+            const totalEstimatedValue = services.reduce((sum, srv) => sum + (srv.estimatedValue || 0), 0);
+
+            // Generate Excel File
+            generateRequestExcel({
+                osNumber,
+                osType,
+                usageArea,
+                projectNumber,
+                assetNumber,
+                estimatedValue: totalEstimatedValue,
+                priority,
+                justification,
+                items: services.map(srv => ({
+                    code: srv.code,
+                    description: srv.description,
+                    quantity: srv.quantity,
+                    unit: srv.unit,
+                    estimatedValue: srv.estimatedValue
+                }))
+            }, 'Serviço');
+
             const requests = services.map(srv => ({
                 request_category: 'Serviço',
                 service_code: srv.code,
@@ -90,7 +116,7 @@ const ServiceRequest: React.FC = () => {
                 usage_area: usageArea,
                 project_number: osType === 'Projeto' ? projectNumber : null,
                 asset_number: assetNumber,
-                estimated_value: estimatedValue
+                estimated_value: srv.estimatedValue
             }));
 
             const { error } = await supabase
@@ -109,7 +135,7 @@ const ServiceRequest: React.FC = () => {
                 user_id: user?.id
             });
 
-            alert(`${services.length} serviços solicitados com sucesso!`);
+            alert(`Solicitação processada e Excel gerado! Envie para bcariello@swmintl.com`);
             navigate('/');
         } catch (error) {
             console.error('Error submitting services:', error);
@@ -208,17 +234,6 @@ const ServiceRequest: React.FC = () => {
                                     className="w-full h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 text-sm focus:ring-primary"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 font-black uppercase tracking-wider">Valor Estimado (R$)</label>
-                                <input
-                                    type="number"
-                                    value={estimatedValue}
-                                    onChange={(e) => setEstimatedValue(parseFloat(e.target.value) || 0)}
-                                    placeholder="0,00"
-                                    step="0.01"
-                                    className="w-full h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 text-sm focus:ring-primary"
-                                />
-                            </div>
                         </div>
                     </div>
 
@@ -241,8 +256,8 @@ const ServiceRequest: React.FC = () => {
                                 </select>
                             </div>
 
-                            <div className="md:col-span-6">
-                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 font-black uppercase tracking-wider">Qtd / Unidade</label>
+                            <div className="md:col-span-5">
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 font-black uppercase tracking-wider">Qtd / Unidade / Valor</label>
                                 <div className="flex gap-2">
                                     <input
                                         type="number"
@@ -254,13 +269,21 @@ const ServiceRequest: React.FC = () => {
                                     <select
                                         value={currentUnit}
                                         onChange={(e) => setCurrentUnit(e.target.value)}
-                                        className="flex-1 h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm"
+                                        className="w-24 h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm"
                                     >
                                         <option>UN</option>
                                         <option>H</option>
                                         <option>M2</option>
                                         <option>GLOBAL</option>
                                     </select>
+                                    <input
+                                        type="number"
+                                        value={currentEstimatedValue}
+                                        onChange={(e) => setCurrentEstimatedValue(parseFloat(e.target.value) || 0)}
+                                        placeholder="Valor R$"
+                                        step="0.01"
+                                        className="flex-1 h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 text-sm"
+                                    />
                                 </div>
                             </div>
 
@@ -293,6 +316,7 @@ const ServiceRequest: React.FC = () => {
                                         <tr>
                                             <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Serviço</th>
                                             <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-widest text-[10px] text-center">Quantidade</th>
+                                            <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-widest text-[10px] text-center">Valor Est.</th>
                                             <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-widest text-[10px] text-right">Ação</th>
                                         </tr>
                                     </thead>
@@ -304,6 +328,7 @@ const ServiceRequest: React.FC = () => {
                                                     <p className="text-[10px] text-slate-400 font-mono">CÓD: {srv.code}</p>
                                                 </td>
                                                 <td className="px-4 py-3 text-center font-black text-primary">{srv.quantity} {srv.unit}</td>
+                                                <td className="px-4 py-3 text-center font-bold text-emerald-600">{srv.estimatedValue > 0 ? `R$ ${srv.estimatedValue.toFixed(2)}` : '-'}</td>
                                                 <td className="px-4 py-3 text-right">
                                                     <button
                                                         type="button"

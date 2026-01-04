@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Part } from '../types';
+import { generateRequestExcel } from '../lib/excel';
 
 const PurchaseRequest: React.FC = () => {
   const navigate = useNavigate();
@@ -10,9 +11,10 @@ const PurchaseRequest: React.FC = () => {
 
   const [parts, setParts] = useState<Part[]>([]);
   const [selectedPartId, setSelectedPartId] = useState('');
-  const [items, setItems] = useState<{ part: Part, quantity: number, unit: string }[]>([]);
+  const [items, setItems] = useState<{ part: Part, quantity: number, unit: string, estimatedValue: number }[]>([]);
   const [priority, setPriority] = useState('Normal');
   const [quantity, setQuantity] = useState(1);
+  const [currentEstimatedValue, setCurrentEstimatedValue] = useState<number>(0);
   const [unit, setUnit] = useState('Unidade (UN)');
   const [justification, setJustification] = useState('');
   const [osNumber, setOsNumber] = useState('');
@@ -20,13 +22,34 @@ const PurchaseRequest: React.FC = () => {
   const [usageArea, setUsageArea] = useState('');
   const [projectNumber, setProjectNumber] = useState('');
   const [assetNumber, setAssetNumber] = useState('');
-  const [estimatedValue, setEstimatedValue] = useState<number>(0);
+  const [globalEstimatedValue, setGlobalEstimatedValue] = useState<number>(0); // Renamed to avoid confusion, though logic focuses on items now
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchParts();
   }, []);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const filteredParts = React.useMemo(() => {
+    const matches = parts.filter(p =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Deduplicate by SKU (preferred) or Name
+    const uniqueMap = new Map();
+    matches.forEach(p => {
+      const key = p.sku || p.name;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, p);
+      }
+    });
+
+    return Array.from(uniqueMap.values());
+  }, [parts, searchTerm]);
 
   useEffect(() => {
     if (parts.length > 0 && partIdsParam) {
@@ -35,7 +58,8 @@ const PurchaseRequest: React.FC = () => {
       const initialItems = selected.map(p => ({
         part: p,
         quantity: 1, // Default quantity for bulk selects
-        unit: p.unit || 'Unidade (UN)'
+        unit: p.unit || 'Unidade (UN)',
+        estimatedValue: 0 // Default
       }));
       setItems(initialItems);
     }
@@ -68,9 +92,11 @@ const PurchaseRequest: React.FC = () => {
       return;
     }
 
-    setItems([...items, { part, quantity, unit }]);
+    setItems([...items, { part, quantity, unit, estimatedValue: currentEstimatedValue }]);
     setSelectedPartId('');
+    setSearchTerm('');
     setQuantity(1);
+    setCurrentEstimatedValue(0);
   };
 
   const removeItem = (idx: number) => {
@@ -89,6 +115,25 @@ const PurchaseRequest: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // Generate Excel File
+      generateRequestExcel({
+        osNumber,
+        osType,
+        usageArea,
+        projectNumber,
+        assetNumber,
+        estimatedValue: items.reduce((acc, item) => acc + (item.estimatedValue * item.quantity), 0), // Sum of items
+        priority,
+        justification,
+        items: items.map(i => ({
+          sku: i.part.sku,
+          name: i.part.name,
+          quantity: i.quantity,
+          unit: i.unit,
+          estimatedValue: i.estimatedValue // Pass per item
+        }))
+      }, 'Material');
+
       const requests = items.map(item => ({
         part_id: item.part.id,
         part_name: item.part.name,
@@ -104,7 +149,7 @@ const PurchaseRequest: React.FC = () => {
         usage_area: usageArea,
         project_number: osType === 'Projeto' ? projectNumber : null,
         asset_number: assetNumber,
-        estimated_value: estimatedValue
+        estimated_value: item.estimatedValue // Use per-item value
       }));
 
       const { error } = await supabase
@@ -125,7 +170,7 @@ const PurchaseRequest: React.FC = () => {
         user_id: user?.id
       });
 
-      alert('Requisição enviada com sucesso!');
+      alert('Requisição enviada e Excel gerado com sucesso! Por favor, encaminhe o arquivo para bcariello@swmintl.com');
       navigate('/requests');
     } catch (error: any) {
       console.error('Error submitting request:', error);
@@ -219,7 +264,7 @@ const PurchaseRequest: React.FC = () => {
                 </div>
               )}
 
-              <div className="md:col-span-1">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nº do Ativo</label>
                 <input
                   type="text"
@@ -229,17 +274,7 @@ const PurchaseRequest: React.FC = () => {
                   className="w-full h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 text-sm focus:ring-primary"
                 />
               </div>
-              <div className="md:col-span-1">
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Valor Estimado (R$)</label>
-                <input
-                  type="number"
-                  value={estimatedValue}
-                  onChange={(e) => setEstimatedValue(parseFloat(e.target.value) || 0)}
-                  placeholder="0,00"
-                  step="0.01"
-                  className="w-full h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 text-sm focus:ring-primary"
-                />
-              </div>
+              {/* Removed Global Estimated Value Input */}
             </div>
           </div>
 
@@ -251,20 +286,75 @@ const PurchaseRequest: React.FC = () => {
 
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                <div className="md:col-span-6">
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Peça</label>
-                  <select
-                    className="w-full h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm"
-                    value={selectedPartId}
-                    onChange={(e) => setSelectedPartId(e.target.value)}
-                  >
-                    <option value="">Selecione para adicionar...</option>
-                    {parts.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                    ))}
-                  </select>
+                <div className="md:col-span-5 relative">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Buscar Peça</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="w-full h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 text-sm focus:ring-primary focus:border-primary"
+                      placeholder="Digite para buscar..."
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setShowDropdown(true);
+                        setSelectedPartId(''); // Clear selection on type
+                      }}
+                      onFocus={() => setShowDropdown(true)}
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => {
+                          setSearchTerm('');
+                          setSelectedPartId('');
+                          setShowDropdown(false);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown Results */}
+                  {showDropdown && (searchTerm || filteredParts.length > 0) && (
+                    <div className="absolute z-50 left-0 right-0 mt-2 bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl max-h-60 overflow-y-auto">
+                      {filteredParts.length > 0 ? (
+                        <ul className="py-2">
+                          {filteredParts.map(p => (
+                            <li
+                              key={p.id}
+                              onClick={() => {
+                                setSelectedPartId(p.id);
+                                setSearchTerm(p.name);
+                                setShowDropdown(false);
+                              }}
+                              className="px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer border-b border-slate-50 dark:border-slate-800/50 last:border-0"
+                            >
+                              <div className="font-bold text-slate-800 dark:text-slate-200">{p.name}</div>
+                              <div className="text-xs text-slate-400 font-mono flex justify-between">
+                                <span>SKU: {p.sku}</span>
+                                <span>Estoque: {p.current_stock} {p.unit}</span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="p-4 text-center text-slate-500 text-sm">
+                          Nenhuma peça encontrada.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Overlay to close dropdown when clicking outside */}
+                  {showDropdown && (
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowDropdown(false)}
+                    />
+                  )}
                 </div>
-                <div className="md:col-span-3">
+                <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Qtd</label>
                   <input
                     type="number"
@@ -275,6 +365,17 @@ const PurchaseRequest: React.FC = () => {
                   />
                 </div>
                 <div className="md:col-span-3">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Valor Unit. (R$)</label>
+                  <input
+                    type="number"
+                    value={currentEstimatedValue}
+                    onChange={(e) => setCurrentEstimatedValue(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    step="0.01"
+                    className="w-full h-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-center text-sm"
+                  />
+                </div>
+                <div className="md:col-span-2">
                   <button
                     type="button"
                     onClick={addItem}
@@ -294,6 +395,7 @@ const PurchaseRequest: React.FC = () => {
                       <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">
                         <th className="px-4 py-3">Item</th>
                         <th className="px-4 py-3 text-center">Qtd</th>
+                        <th className="px-4 py-3 text-center">Valor Est.</th>
                         <th className="px-4 py-3 text-right">Ação</th>
                       </tr>
                     </thead>
@@ -305,6 +407,9 @@ const PurchaseRequest: React.FC = () => {
                             <p className="text-xs text-slate-400 font-mono">{item.part.sku}</p>
                           </td>
                           <td className="px-4 py-3 text-center font-bold">{item.quantity} {item.unit}</td>
+                          <td className="px-4 py-3 text-center text-slate-600">
+                            {item.estimatedValue ? `R$ ${item.estimatedValue.toFixed(2)}` : '-'}
+                          </td>
                           <td className="px-4 py-3 text-right">
                             <button
                               type="button"
@@ -397,7 +502,7 @@ const PurchaseRequest: React.FC = () => {
           </div>
         </div>
       </div>
-    </div >
+    </div>
   );
 };
 

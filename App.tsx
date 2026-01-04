@@ -16,6 +16,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Users = lazy(() => import('./pages/Users'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const IncomingRequests = lazy(() => import('./pages/IncomingRequests'));
 
 const PageLoading = () => (
   <div className="flex items-center justify-center min-h-[400px]">
@@ -165,6 +166,7 @@ const App: React.FC = () => {
             <Route path="/requests" element={<PurchaseRequest />} />
             <Route path="/service-requests" element={<ServiceRequest />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/incoming-requests" element={<IncomingRequests />} />
             <Route path="/users" element={<Users />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

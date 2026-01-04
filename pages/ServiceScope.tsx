@@ -30,7 +30,7 @@ const ServiceScope: React.FC<{ user?: User }> = ({ user }) => {
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiQuery, setAiQuery] = useState('');
 
-    // Simulated AI Logic
+    // AI Maintenance Professional Persona Logic
     useEffect(() => {
         if (!serviceType) return;
 
@@ -41,34 +41,42 @@ const ServiceScope: React.FC<{ user?: User }> = ({ user }) => {
             switch (serviceType) {
                 case 'Elétrica':
                     insights = [
-                        'Sugestão: Incluir verificação de conformidade com NR-10.',
-                        'Insight: Identificar se há necessidade de bloqueio de energias perigosas (LOTO).',
-                        'Checklist: Verificar estado dos EPIs dielétricos.',
-                        'Documentação: Anexar diagrama unifilar atualizado.'
+                        'RECOMENDAÇÃO: Implementar bloqueio LOTO (Lockout/Tagout) em todos os pontos de energia.',
+                        'NORMA TÉCNICA: Garantir conformidade rigorosa com a NR-10 para serviços em painéis.',
+                        'ANÁLISE PREDITIVA: Verificar histórico de termografia para identificar pontos quentes precocemente.',
+                        'BOA PRÁTICA: Validar a ausência de tensão com multímetro calibrado antes do contato humano.'
                     ];
                     break;
                 case 'Mecânica':
                     insights = [
-                        'Sugestão: Descrever ferramentas de torque específicas necessárias.',
-                        'Insight: Verificar se o equipamento exige lubrificação pós-serviço.',
-                        'Norma: NR-12 - Segurança no Trabalho em Máquinas e Equipamentos.',
-                        'Etapa: Incluir teste de vibração após montagem.'
+                        'RECOMENDAÇÃO: Utilizar torquímetro para aperto final conforme especificação do fabricante.',
+                        'CONFIABILIDADE: Verificar alinhamento a laser se houver troca de motores ou acoplamentos.',
+                        'NORMA TÉCNICA: Seguir diretrizes da NR-12 para proteção de partes móveis expostas.',
+                        'ANÁLISE DE VIBRAÇÃO: Considerar coleta de dados pós-intervenção para validar o reparo.'
                     ];
                     break;
                 case 'Civil':
                     insights = [
-                        'Sugestão: Verificar tempo de cura dos materiais utilizados.',
-                        'Insight: Isolar área para evitar dispersão de poeira e resíduos.',
-                        'Normas: Consultar ABNT NBR 18 para segurança na construção.',
-                        'Meio Ambiente: Definir local de descarte de entulho.'
+                        'RECOMENDAÇÃO: Avaliar integridade estrutural antes de furos ou demolições em lajes.',
+                        'SEGURANÇA: Isolar a área contra queda de objetos em níveis inferiores (NR-35).',
+                        'GESTÃO DE RESÍDUOS: Definir segregação de entulho conforme plano de gestão ambiental.',
+                        'QUALIDADE: Respeitar janelas de cura de grautes e polímeros para garantir resistência.'
+                    ];
+                    break;
+                case 'TI':
+                    insights = [
+                        'SEGURANÇA DA INFORMAÇÃO: Garantir redundância de dados antes de intervenções no hardware.',
+                        'LÓGICA: Testar conectividade de rede ponta a ponta após qualquer realocação de cabos.',
+                        'FÍSICO: Organizar o cabeamento para facilitar fluxo de ar e futuras manutenções.',
+                        'DOCUMENTAÇÃO: Atualizar o mapa de topologia de rede após a conclusão do serviço.'
                     ];
                     break;
                 default:
                     insights = [
-                        'Dica: Tente ser o mais detalhado possível nas etapas para evitar retrabalho.',
-                        'Lembrete: SEMPRE verifique os arredores antes de iniciar o serviço.',
-                        'Insight: Considere o impacto do serviço na produção (parada total ou parcial).',
-                        'Segurança: A Permissão de Trabalho (PT) é obrigatória.'
+                        'DICA PROFISSIONAL: Detalhe as etapas críticas para garantir o MTTR (Mean Time To Repair).',
+                        'SEGURANÇA: A Permissão de Trabalho (PT) deve ser assinada por todos os envolvidos no local.',
+                        'GESTÃO: Identifique se há necessidade de peças de reposição (Lead Time) antes de iniciar.',
+                        'QUALIDADE: Realize o check-out operacional com o operador do equipamento ao finalizar.'
                     ];
             }
 
@@ -143,32 +151,39 @@ const ServiceScope: React.FC<{ user?: User }> = ({ user }) => {
         if (!aiQuery.trim()) return;
 
         setIsAiLoading(true);
-        // Simulating artificial intelligence "web search" delay
+        // Simulating AI expert search
         setTimeout(() => {
             const query = aiQuery.toLowerCase();
             let newInsights = [...aiInsights];
 
             if (query.includes('rolamento')) {
                 newInsights = [
-                    'WEB FOUND: Utilizar aquecedor por indução para montagem.',
-                    'PRÁTICA: Nunca bater diretamente no anel interno.',
-                    'NORMA: Verificar folga radial conforme catálogo C3/C4.',
-                    'DICA: Limpeza rigorosa do alojamento antes da instalação.'
+                    'ESPECIALISTA: Utilizar aquecedor por indução para evitar deformação plástica.',
+                    'PRÁTICA INDUSTRIAL: Aplicar técnica de montagem a frio apenas sob supervisão técnica.',
+                    'NORMA: Consultar tolerância de ajuste ISO (ex: H7/g6) para o eixo e alojamento.',
+                    'LUBRIFICAÇÃO: Definir o tipo e volume de graxa baseando-se no fator DN do rolamento.'
                 ];
             } else if (query.includes('solda') || query.includes('soldagem')) {
                 newInsights = [
-                    'WEB FOUND: AWS D1.1 - Código de Soldagem Estrutural.',
-                    'PRÁTICA: Controle de temperatura de pré-aquecimento.',
-                    'NORMAS: NR-18 e NR-34 para trabalhos a quente.',
-                    'CHECK: Ensaio de Líquido Penetrante (LP) pós-solda.'
+                    'QUALIFICAÇÃO: Exigir QBZ (Qualificação de Procedimento de Soldagem) dos soldadores.',
+                    'PRÁTICA: Controle rigoroso do aporte térmico (Heat Input) para evitar empenamento.',
+                    'SEGURANÇA: Monitorar níveis de gases em espaços confinados (NR-33) se necessário.',
+                    'ENSAIO: Realizar ensaio visual e dimensional em 100% dos cordões.'
+                ];
+            } else if (query.includes('hidráulica') || query.includes('oleo')) {
+                newInsights = [
+                    'DICA TÉCNICA: Identificar classe de limpeza ISO 4406 exigida pelo sistema.',
+                    'PREVENÇÃO: Verificar compatibilidade de vedantes (O-rings) com o fluido utilizado.',
+                    'MANUTENÇÃO: Sangrar o ar do sistema para evitar fenômeno de cavitação e trancos.',
+                    'SEGURANÇA: Aliviar pressão residual (acumuladores) antes de qualquer abertura.'
                 ];
             } else {
                 newInsights = [
-                    `Resultado para "${aiQuery}":`,
-                    '1. Verificar compatibilidade de materiais.',
-                    '2. Isolar energias (LOTO) se aplicável.',
-                    '3. Consultar manual original do fabricante.',
-                    '4. Registrar fotos do "antes" e "depois".'
+                    `PARECER TÉCNICO PARA "${aiQuery.toUpperCase()}":`,
+                    '1. Priorizar segurança intrínseca e bloqueios mecânicos.',
+                    '2. Consultar catálogo de peças para especificações originais (OEM).',
+                    '3. Avaliar impacto ambiental e descarte de consumíveis.',
+                    '4. Documentar registros fotográficos para análise de falha futura.'
                 ];
             }
 
@@ -402,9 +417,12 @@ const ServiceScope: React.FC<{ user?: User }> = ({ user }) => {
                                     <span className="material-symbols-outlined text-[18px]">search</span>
                                 </button>
                             </div>
-                            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                                <p className="text-[10px] text-primary font-bold uppercase tracking-wider mb-2">Contexto:</p>
-                                <p className="text-xs text-slate-300 font-medium">Você está criando um escopo para <span className="text-white font-bold uppercase">{serviceType}</span>.</p>
+                            <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
+                                <p className="text-[10px] text-primary font-black uppercase tracking-[0.2em] mb-2">Especialista de Plantão:</p>
+                                <p className="text-xs text-slate-100 font-bold leading-tight">
+                                    Baseado no seu escopo de <span className="text-primary underline underline-offset-4 decoration-primary/40 uppercase">{serviceType}</span>,
+                                    recomendo focar no cumprimento das normas regulamentadoras e na análise técnica detalhada.
+                                </p>
                             </div>
 
                             <div className="space-y-3">

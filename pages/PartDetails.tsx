@@ -346,11 +346,16 @@ const PartDetails: React.FC = () => {
         {/* Left: Image & Specs */}
         <div className="flex flex-col gap-6">
           {/* Product Image */}
-          <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm aspect-square group">
-            <div
-              className="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
-              style={{ backgroundImage: `url("${part.image_url || 'https://picsum.photos/seed/' + part.id + '/600/600'}")` }}
-            />
+          {/* Product Image */}
+          <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm aspect-square group relative flex items-center justify-center bg-slate-100 dark:bg-slate-900">
+            {part.image_url ? (
+              <div
+                className="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
+                style={{ backgroundImage: `url("${part.image_url}")` }}
+              />
+            ) : (
+              <span className="material-symbols-outlined text-slate-300 text-6xl">image</span>
+            )}
           </div>
 
           {/* Specifications */}

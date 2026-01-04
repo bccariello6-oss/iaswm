@@ -66,7 +66,7 @@ const Alerts: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
         <div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-            <span className="material-symbols-outlined text-red-600 text-[40px] fill">notifications_active</span>
+            <span className="material-symbols-outlined text-red-600 text-[40px] fill">emergency</span>
             Alertas de Reposição
           </h1>
           <p className="text-slate-500 mt-2 max-w-2xl">
@@ -101,7 +101,7 @@ const Alerts: React.FC = () => {
             </div>
           </div>
           <p className="text-xs text-red-600 font-bold mt-4 flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px]">warning</span> Estoque zerado, requer ação imediata
+            <span className="material-symbols-outlined text-[14px]">emergency</span> Estoque zerado, requer ação imediata
           </p>
         </div>
 
@@ -116,7 +116,7 @@ const Alerts: React.FC = () => {
             </div>
           </div>
           <p className="text-xs text-amber-600 font-bold mt-4 flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px]">info</span> Itens abaixo da quantidade mínima
+            <span className="material-symbols-outlined text-[14px]">emergency</span> Itens abaixo da quantidade mínima
           </p>
         </div>
       </div>
@@ -145,7 +145,7 @@ const Alerts: React.FC = () => {
 
               <div className="p-5 flex-1 flex flex-col lg:flex-row items-center gap-6">
                 <div className={`size-16 rounded-2xl flex items-center justify-center shrink-0 ${part.quantity === 0 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
-                  <span className="material-symbols-outlined text-[32px]">{part.quantity === 0 ? 'dangerous' : 'history_toggle_off'}</span>
+                  <span className="material-symbols-outlined text-[32px]">{part.quantity === 0 ? 'dangerous' : 'warning'}</span>
                 </div>
 
                 <div className="flex-1 text-center lg:text-left">

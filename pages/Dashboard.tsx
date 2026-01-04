@@ -8,6 +8,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+  const isAdmin = user.role === 'Administrador';
   const [parts, setParts] = useState<Part[]>([]);
   const [materialRequests, setMaterialRequests] = useState<PurchaseRequest[]>([]);
   const [serviceRequests, setServiceRequests] = useState<PurchaseRequest[]>([]);
@@ -64,7 +65,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
       const formatRequest = (req: any) => ({
         ...req,
-        date: new Date(req.created_at).toLocaleDateString('pt-BR')
+        date: new Date(req.created_at).toLocaleDateString('pt-BR'),
+        partName: req.part_name, // Map part_name to partName
       });
 
       setMaterialRequests((matData || []).map(formatRequest) as any);
@@ -103,7 +105,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <span className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg material-symbols-outlined">inventory_2</span>
             <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+12%</span>
           </div>
-          <p className="text-sm font-medium text-slate-500">Total em Peças</p>
+          <p className="text-sm font-medium text-slate-500">Total de Peças em Reposição</p>
           <p className="text-2xl font-black text-slate-900 dark:text-white">{parts.length}</p>
         </div>
         <div className="bg-white dark:bg-surface-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -140,7 +142,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <span className="material-symbols-outlined text-primary text-[20px]">inventory_2</span>
               Requisições Recentes de Material
             </h3>
-            <Link to="/requests" className="text-xs font-bold text-primary hover:underline">Ver todas</Link>
+            <Link to={isAdmin ? "/incoming-requests?tab=Material" : "/requests"} className="text-xs font-bold text-primary hover:underline">Ver todas</Link>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {materialRequests.length > 0 ? materialRequests.map(req => (
@@ -155,7 +157,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                       <p className="text-xs text-slate-500">#{req.sku || 'N/A'}</p>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${req.status === 'Aprovado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${req.status === 'Aprovado' || req.status === 'Pedido de Compra Emitido' ? 'bg-green-100 text-green-700' :
+                    req.status === 'Rejeitado' ? 'bg-red-100 text-red-700' :
+                      req.status === 'RC Emitida' ? 'bg-blue-100 text-blue-700' :
+                        req.status === 'Aguardando Aprovação' ? 'bg-purple-100 text-purple-700' :
+                          'bg-amber-100 text-amber-700'
                     }`}>
                     {req.status}
                   </span>
@@ -178,7 +184,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <span className="material-symbols-outlined text-primary text-[20px]">engineering</span>
               Requisições Recentes de Serviços
             </h3>
-            <Link to="/service-requests" className="text-xs font-bold text-primary hover:underline">Ver todas</Link>
+            <Link to={isAdmin ? "/incoming-requests?tab=Serviço" : "/service-requests"} className="text-xs font-bold text-primary hover:underline">Ver todas</Link>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {serviceRequests.length > 0 ? serviceRequests.map(req => (
@@ -193,7 +199,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                       <p className="text-xs text-slate-500">Cód: {req.service_code || 'N/A'}</p>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${req.status === 'Aprovado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${req.status === 'Aprovado' || req.status === 'Pedido de Compra Emitido' ? 'bg-green-100 text-green-700' :
+                    req.status === 'Rejeitado' ? 'bg-red-100 text-red-700' :
+                      req.status === 'RC Emitida' ? 'bg-blue-100 text-blue-700' :
+                        req.status === 'Aguardando Aprovação' ? 'bg-purple-100 text-purple-700' :
+                          'bg-amber-100 text-amber-700'
                     }`}>
                     {req.status}
                   </span>
@@ -216,7 +226,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         <div className="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
             <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-amber-500 text-[20px]">warning</span>
+              <span className="material-symbols-outlined text-red-500 text-[20px] fill">emergency</span>
               Alertas de Estoque
             </h3>
             <Link to="/alerts" className="text-xs font-bold text-primary hover:underline">Ver todos</Link>

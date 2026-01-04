@@ -71,6 +71,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     { label: 'Alertas de Reposição', icon: 'notifications', path: '/alerts' },
     { label: 'Requisições de Material', icon: 'description', path: '/requests' },
     { label: 'Requisições de Serviço', icon: 'engineering', path: '/service-requests' },
+    ...(user.role === 'Administrador' ? [{ label: 'Recebimento de Requisições', icon: 'move_to_inbox', path: '/incoming-requests' }] : []),
     { label: 'Escopo de Serviço', icon: 'assignment_turned_in', path: '/escopo' },
     { label: 'Relatórios', icon: 'insert_chart', path: '/reports' },
     { label: 'Usuários', icon: 'group', path: '/users' },
@@ -115,15 +116,19 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                       : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}
                 `}
               >
-                <span className={`material-symbols-outlined text-[20px] ${isActive(item.path) ? 'fill-1' : ''} ${(item.path === '/alerts' && unreadCount > 0) ? 'animate-bounce' : ''}`}>
-                  {item.icon}
-                </span>
-                <span className="text-sm font-medium">{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <span className={`material-symbols-outlined text-[20px] ${isActive(item.path) ? 'fill-1' : ''} ${(item.path === '/alerts' && unreadCount > 0) ? 'text-red-600 dark:text-red-500 animate-pulse' : ''}`}>
+                    {item.path === '/alerts' && unreadCount > 0 ? 'notifications_active' : item.icon}
+                  </span>
+                  <span className={`text-sm font-medium ${(item.path === '/alerts' && unreadCount > 0) ? 'text-red-700 dark:text-red-400 font-bold' : ''}`}>{item.label}</span>
+                </div>
                 {isActive(item.path) && (
                   <span className="ml-auto size-1.5 rounded-full bg-primary"></span>
                 )}
                 {item.path === '/alerts' && unreadCount > 0 && (
-                  <span className="ml-auto px-2 py-0.5 rounded-full bg-red-600 text-[10px] text-white font-black">{unreadCount}</span>
+                  <span className="ml-auto flex items-center justify-center size-5 rounded-full bg-red-600 text-[10px] text-white font-black shadow-md shadow-red-500/20">
+                    {unreadCount}
+                  </span>
                 )}
               </Link>
             ))}
@@ -171,11 +176,15 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             <div className="relative">
               <button
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="relative p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500"
+                className={`relative p-2 rounded-full transition-colors ${unreadCount > 0 ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500'}`}
               >
-                <span className="material-symbols-outlined text-[24px]">notifications</span>
+                <span className={`material-symbols-outlined text-[24px] ${unreadCount > 0 ? 'animate-swing' : ''}`}>
+                  {unreadCount > 0 ? 'notifications_active' : 'notifications'}
+                </span>
                 {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 size-2.5 bg-red-500 border-2 border-white dark:border-surface-dark rounded-full animate-pulse"></span>
+                  <span className="absolute -top-1 -right-1 size-5 bg-red-600 border-2 border-white dark:border-surface-dark rounded-full flex items-center justify-center text-[10px] font-black text-white animate-pulse">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
                 )}
               </button>
 

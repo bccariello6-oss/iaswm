@@ -76,7 +76,7 @@ export interface PurchaseRequest {
   unit: string;
   priority: 'Baixa' | 'Normal' | 'Urgente';
   justification: string;
-  status: 'Pendente' | 'Aprovado' | 'Comprado';
+  status: 'Pendente' | 'Aguardando RC' | 'RC Emitida' | 'Aguardando Aprovação' | 'Aprovada' | 'Aguardando Pedido' | 'Pedido de Compra Emitido' | 'Rejeitado';
   date: string;
   os_number?: string;
   os_type?: 'Ordem Corretiva' | 'Preventiva' | 'Corretiva Não Planejada' | 'Melhoria' | 'Projeto';
@@ -84,4 +84,5 @@ export interface PurchaseRequest {
   project_number?: string;
   estimated_value?: number;
   asset_number?: string;
+  erp_request_number?: string;
 }

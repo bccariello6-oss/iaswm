@@ -24,7 +24,7 @@ const Users: React.FC = () => {
           role: profile.role as any || 'Visualização',
           status: profile.status as any || 'Ativo',
           lastAccess: profile.updated_at ? new Date(profile.updated_at).toLocaleDateString() : 'N/A',
-          avatarUrl: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || 'U')}&background=random`,
+          avatarUrl: profile.avatar_url,
           department: profile.department
         })));
       }
@@ -69,22 +69,28 @@ const Users: React.FC = () => {
   };
 
   const deleteUser = async (id: string, name: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o perfil de "${name}"? Esta ação não pode ser desfeita.`)) return;
+    if (!window.confirm(`Tem certeza que deseja excluir o usuário "${name}"? Esta ação removerá o acesso e excluirá todos os dados do perfil permanentemente.`)) return;
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', id);
+      setLoading(true);
+      // Call Edge Function to delete from Auth
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: id }
+      });
 
-      if (error) throw error;
-      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'Inativo' as any } : u)); // Soft delete/Deactivate or really delete? User said "Excluir".
-      // Actually deleting from UI too:
+      if (error) {
+        console.error('Edge Function Error Object:', error);
+        throw new Error(error.message || 'Erro desconhecido na Edge Function');
+      }
+
       setUsers(prev => prev.filter(u => u.id !== id));
-      alert(`Perfil de ${name} excluído com sucesso.`);
-    } catch (err) {
-      console.error('Erro ao excluir usuário:', err);
-      alert('Erro ao excluir usuário. Verifique as permissões.');
+      alert(`Usuário ${name} excluído com sucesso.`);
+    } catch (err: any) {
+      console.error('Erro detalhado ao excluir usuário:', err);
+      const errorMsg = err.message || 'Erro desconhecido';
+      alert(`Erro ao excluir usuário: ${errorMsg}\n\n(Verifique o console para mais detalhes técnicos)`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -133,10 +139,15 @@ const Users: React.FC = () => {
                 <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="size-10 rounded-full bg-cover bg-center ring-2 ring-slate-100 dark:ring-slate-700" style={{ backgroundImage: `url("${user.avatarUrl}")` }} />
+                      {user.avatarUrl ? (
+                        <div className="size-10 rounded-full bg-cover bg-center ring-2 ring-slate-100 dark:ring-slate-700" style={{ backgroundImage: `url("${user.avatarUrl}")` }} />
+                      ) : (
+                        <div className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center ring-2 ring-slate-100 dark:ring-slate-700">
+                          <span className="material-symbols-outlined text-slate-400 text-[20px]">person</span>
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm font-bold text-slate-900 dark:text-white">{user.name}</p>
-                        <p className="text-[10px] text-slate-400 font-mono uppercase">UUID: {user.id.substring(0, 8)}...</p>
                       </div>
                     </div>
                   </td>
